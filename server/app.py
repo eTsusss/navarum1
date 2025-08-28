@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production')  # В продакшене используйте безопасный ключ
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'H,jVXSlcAknKoP0IsvMpxGhe.uYtZRT-')  # В продакшене используйте безопасный ключ
 
 # Настройка CORS для поддержки origin 'null' (файлы, открытые напрямую) и продакшн доменов
 CORS(app, origins=[
