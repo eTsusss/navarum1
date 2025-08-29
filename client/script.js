@@ -355,21 +355,36 @@ function displayProducts(products) {
         return;
     }
     
-    productsContainer.innerHTML = products.map(product => `
-        <div class="product-card" data-product-id="${product.id}">
-            <div class="product-image">
-                <img src="${product.image_url}" alt="${product.name}" loading="lazy">
-                <div class="overlay">
-                    <button class="view-button">Подробнее</button>
+    productsContainer.innerHTML = products.map(product => {
+        // Определяем источник изображения
+        let imageSrc = '';
+        if (product.image_data) {
+            // Если есть данные изображения в base64, используем их
+            imageSrc = `data:image/jpeg;base64,${product.image_data}`;
+        } else if (product.image_url) {
+            // Если есть URL изображения, используем его
+            imageSrc = product.image_url;
+        } else {
+            // Если нет изображения, используем заглушку
+            imageSrc = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+        }
+        
+        return `
+            <div class="product-card" data-product-id="${product.id}">
+                <div class="product-image">
+                    <img src="${imageSrc}" alt="${product.name}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+RXJyb3I8L3RleHQ+PC9zdmc+';">
+                    <div class="overlay">
+                        <button class="view-button">Подробнее</button>
+                    </div>
+                </div>
+                <div class="product-info">
+                    <h3>${product.name}</h3>
+                    <div class="price">${formatPrice(product.price)} ₽</div>
+                    <p>${product.description.substring(0, 100)}${product.description.length > 100 ? '...' : ''}</p>
                 </div>
             </div>
-            <div class="product-info">
-                <h3>${product.name}</h3>
-                <div class="price">${formatPrice(product.price)} ₽</div>
-                <p>${product.description.substring(0, 100)}${product.description.length > 100 ? '...' : ''}</p>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
     
     // Добавляем обработчики для карточек товаров
     document.querySelectorAll('.product-card').forEach(card => {
@@ -455,7 +470,18 @@ function showProductModal(product) {
     // Сохраняем текущий товар для корзины
     currentProduct = product;
     
-    modalImage.src = product.image_url;
+    // Определяем источник изображения
+    if (product.image_data) {
+        // Если есть данные изображения в base64, используем их
+        modalImage.src = `data:image/jpeg;base64,${product.image_data}`;
+    } else if (product.image_url) {
+        // Если есть URL изображения, используем его
+        modalImage.src = product.image_url;
+    } else {
+        // Если нет изображения, используем заглушку
+        modalImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+    }
+    
     modalImage.alt = product.name;
     modalTitle.textContent = product.name;
     modalPrice.textContent = `${formatPrice(product.price)} ₽`;
@@ -731,27 +757,42 @@ async function loadProductsForEdit() {
             return;
         }
         
-        productsList.innerHTML = products.map(product => `
-            <div class="edit-product-item" data-product-id="${product.id}">
-                <div class="edit-product-image">
-                    <img src="${product.image_url}" alt="${product.name}">
+        productsList.innerHTML = products.map(product => {
+            // Определяем источник изображения
+            let imageSrc = '';
+            if (product.image_data) {
+                // Если есть данные изображения в base64, используем их
+                imageSrc = `data:image/jpeg;base64,${product.image_data}`;
+            } else if (product.image_url) {
+                // Если есть URL изображения, используем его
+                imageSrc = product.image_url;
+            } else {
+                // Если нет изображения, используем заглушку
+                imageSrc = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+            }
+            
+            return `
+                <div class="edit-product-item" data-product-id="${product.id}">
+                    <div class="edit-product-image">
+                        <img src="${imageSrc}" alt="${product.name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+RXJyb3I8L3RleHQ+PC9zdmc+';">
+                    </div>
+                    <div class="edit-product-info">
+                        <h4>${product.name}</h4>
+                        <p><strong>Цена:</strong> ${formatPrice(product.price)} ₽</p>
+                        <p><strong>Категория:</strong> ${product.category}</p>
+                        <p>${product.description.substring(0, 100)}...</p>
+                    </div>
+                    <div class="edit-product-actions">
+                        <button class="edit-btn" onclick="editProduct(${product.id})">
+                            <i class="fas fa-edit"></i> Редактировать
+                        </button>
+                        <button class="delete-btn" onclick="deleteProduct(${product.id})">
+                            <i class="fas fa-trash"></i> Удалить
+                        </button>
+                    </div>
                 </div>
-                <div class="edit-product-info">
-                    <h4>${product.name}</h4>
-                    <p><strong>Цена:</strong> ${formatPrice(product.price)} ₽</p>
-                    <p><strong>Категория:</strong> ${product.category}</p>
-                    <p>${product.description.substring(0, 100)}...</p>
-                </div>
-                <div class="edit-product-actions">
-                    <button class="edit-btn" onclick="editProduct(${product.id})">
-                        <i class="fas fa-edit"></i> Редактировать
-                    </button>
-                    <button class="delete-btn" onclick="deleteProduct(${product.id})">
-                        <i class="fas fa-trash"></i> Удалить
-                    </button>
-                </div>
-            </div>
-        `).join('');
+            `;
+        }).join('');
         
     } catch (error) {
         console.error('Ошибка загрузки товаров для редактирования:', error);

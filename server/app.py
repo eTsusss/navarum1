@@ -458,18 +458,26 @@ def add_product(current_user):
     
     if 'image' in request.files:
         file = request.files['image']
-        if file and allowed_file(file.filename):
-            # Сохраняем файл
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            # Читаем файл как BLOB для сохранения в БД
-            with open(filepath, 'rb') as f:
-                image_data = f.read()
-            
-            # Удаляем временный файл
-            os.remove(filepath)
+        if file and file.filename and allowed_file(file.filename):
+            try:
+                # Сохраняем файл временно
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                
+                # Читаем файл как BLOB для сохранения в БД
+                with open(filepath, 'rb') as f:
+                    image_data = f.read()
+                
+                print(f"Image uploaded successfully: {filename}, size: {len(image_data)} bytes")
+                
+                # Удаляем временный файл
+                os.remove(filepath)
+            except Exception as e:
+                print(f"Error processing image: {e}")
+                return jsonify({'error': f'Ошибка обработки изображения: {str(e)}'}), 500
+        elif file and file.filename:
+            return jsonify({'error': 'Неподдерживаемый формат файла. Разрешены: png, jpg, jpeg, gif, webp'}), 400
     
     # Получаем данные из формы или JSON
     if request.is_json:
@@ -483,27 +491,38 @@ def add_product(current_user):
     # Если нет загруженного файла, используем URL
     if not image_data:
         image_url = data.get('image_url', '')
+        print(f"No image file uploaded, using URL: {image_url}")
     
     conn = sqlite3.connect('products.db')
     cursor = conn.cursor()
     
-    cursor.execute('''
-        INSERT INTO products (name, description, price, image_url, image_data, category, size, material, density)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        data['name'], data['description'], data['price'],
-        image_url, image_data, data.get('category', ''),
-        data.get('size', ''), data.get('material', ''), data.get('density', '')
-    ))
-    
-    product_id = cursor.lastrowid
-    conn.commit()
-    conn.close()
-    
-    return jsonify({
-        'message': 'Товар успешно добавлен',
-        'product_id': product_id
-    }), 201
+    try:
+        cursor.execute('''
+            INSERT INTO products (name, description, price, image_url, image_data, category, size, material, density)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            data['name'], data['description'], data['price'],
+            image_url, image_data, data.get('category', ''),
+            data.get('size', ''), data.get('material', ''), data.get('density', '')
+        ))
+        
+        product_id = cursor.lastrowid
+        conn.commit()
+        
+        print(f"Product added successfully: ID={product_id}, name={data['name']}, has_image_data={image_data is not None}")
+        
+        return jsonify({
+            'message': 'Товар успешно добавлен',
+            'product_id': product_id,
+            'has_image': image_data is not None or bool(image_url)
+        }), 201
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Error adding product: {e}")
+        return jsonify({'error': f'Ошибка добавления товара: {str(e)}'}), 500
+    finally:
+        conn.close()
 
 @app.route('/api/admin/products/<int:product_id>', methods=['PUT'])
 @token_required
@@ -516,18 +535,26 @@ def update_product(current_user, product_id):
     
     if 'image' in request.files:
         file = request.files['image']
-        if file and allowed_file(file.filename):
-            # Сохраняем файл
-            filename = secure_filename(file.filename)
-            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-            file.save(filepath)
-            
-            # Читаем файл как BLOB для сохранения в БД
-            with open(filepath, 'rb') as f:
-                image_data = f.read()
-            
-            # Удаляем временный файл
-            os.remove(filepath)
+        if file and file.filename and allowed_file(file.filename):
+            try:
+                # Сохраняем файл временно
+                filename = secure_filename(file.filename)
+                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                file.save(filepath)
+                
+                # Читаем файл как BLOB для сохранения в БД
+                with open(filepath, 'rb') as f:
+                    image_data = f.read()
+                
+                print(f"Image updated successfully: {filename}, size: {len(image_data)} bytes")
+                
+                # Удаляем временный файл
+                os.remove(filepath)
+            except Exception as e:
+                print(f"Error processing image update: {e}")
+                return jsonify({'error': f'Ошибка обработки изображения: {str(e)}'}), 500
+        elif file and file.filename:
+            return jsonify({'error': 'Неподдерживаемый формат файла. Разрешены: png, jpg, jpeg, gif, webp'}), 400
     
     # Получаем данные из формы или JSON
     if request.is_json:
@@ -547,33 +574,42 @@ def update_product(current_user, product_id):
     # Если нет загруженного файла, используем URL
     if not image_data:
         image_url = data.get('image_url', '')
+        print(f"No image file uploaded for update, using URL: {image_url}")
     
-    # Обновляем товар
-    if image_data:
-        cursor.execute('''
-            UPDATE products 
-            SET name = ?, description = ?, price = ?, image_url = ?, image_data = ?, category = ?, size = ?, material = ?, density = ?
-            WHERE id = ?
-        ''', (
-            data.get('name'), data.get('description'), data.get('price'),
-            image_url, image_data, data.get('category'), data.get('size'),
-            data.get('material'), data.get('density'), product_id
-        ))
-    else:
-        cursor.execute('''
-            UPDATE products 
-            SET name = ?, description = ?, price = ?, image_url = ?, category = ?, size = ?, material = ?, density = ?
-            WHERE id = ?
-        ''', (
-            data.get('name'), data.get('description'), data.get('price'),
-            image_url, data.get('category'), data.get('size'),
-            data.get('material'), data.get('density'), product_id
-        ))
-    
-    conn.commit()
-    conn.close()
-    
-    return jsonify({'message': 'Товар успешно обновлен'})
+    try:
+        # Обновляем товар
+        if image_data:
+            cursor.execute('''
+                UPDATE products 
+                SET name = ?, description = ?, price = ?, image_url = ?, image_data = ?, category = ?, size = ?, material = ?, density = ?
+                WHERE id = ?
+            ''', (
+                data.get('name'), data.get('description'), data.get('price'),
+                image_url, image_data, data.get('category'), data.get('size'),
+                data.get('material'), data.get('density'), product_id
+            ))
+            print(f"Product updated with new image: ID={product_id}")
+        else:
+            cursor.execute('''
+                UPDATE products 
+                SET name = ?, description = ?, price = ?, image_url = ?, category = ?, size = ?, material = ?, density = ?
+                WHERE id = ?
+            ''', (
+                data.get('name'), data.get('description'), data.get('price'),
+                image_url, data.get('category'), data.get('size'),
+                data.get('material'), data.get('density'), product_id
+            ))
+            print(f"Product updated without image change: ID={product_id}")
+        
+        conn.commit()
+        return jsonify({'message': 'Товар успешно обновлен'})
+        
+    except Exception as e:
+        conn.rollback()
+        print(f"Error updating product: {e}")
+        return jsonify({'error': f'Ошибка обновления товара: {str(e)}'}), 500
+    finally:
+        conn.close()
 
 @app.route('/api/admin/products/<int:product_id>', methods=['DELETE'])
 @token_required
@@ -606,6 +642,8 @@ def get_products():
     
     conn.close()
     
+    print(f"Retrieved {len(products)} products from database")
+    
     products_list = []
     for product in products:
         product_data = {
@@ -626,8 +664,11 @@ def get_products():
             try:
                 image_base64 = base64.b64encode(product[5]).decode('utf-8')
                 product_data['image_data'] = image_base64
-            except:
-                pass
+                print(f"Product {product[0]} has image_data: {len(image_base64)} chars")
+            except Exception as e:
+                print(f"Error encoding image_data for product {product[0]}: {e}")
+        else:
+            print(f"Product {product[0]} has no image_data, image_url: {product[4]}")
         
         products_list.append(product_data)
     
