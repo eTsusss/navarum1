@@ -519,8 +519,10 @@ function showAddProductForm() {
                     <input type="number" id="product-price" name="price" step="0.01" required>
                 </div>
                 <div class="form-group">
-                    <label for="product-image">URL изображения:</label>
-                    <input type="url" id="product-image" name="image_url" required>
+                    <label for="product-image">Изображение товара:</label>
+                    <input type="file" id="product-image" name="image" accept="image/*">
+                    <small>Или укажите URL изображения:</small>
+                    <input type="url" id="product-image-url" name="image_url" placeholder="https://example.com/image.jpg">
                 </div>
                 <div class="form-group">
                     <label for="product-category">Категория:</label>
@@ -575,25 +577,31 @@ async function handleAddProduct(e) {
     e.preventDefault();
     
     const formData = new FormData(e.target);
-    const productData = {
-        name: formData.get('name'),
-        description: formData.get('description'),
-        price: parseFloat(formData.get('price')),
-        image_url: formData.get('image_url'),
-        category: formData.get('category'),
-        size: formData.get('size'),
-        material: formData.get('material'),
-        density: formData.get('density')
-    };
+    
+    // Проверяем, есть ли файл изображения
+    const imageFile = formData.get('image');
+    const imageUrl = formData.get('image_url');
+    
+    // Если нет ни файла, ни URL, показываем ошибку
+    if (!imageFile.name && !imageUrl) {
+        showNotification('Необходимо указать изображение товара (файл или URL)', 'error');
+        return;
+    }
+    
+    // Если есть файл, убираем URL из FormData
+    if (imageFile.name) {
+        formData.delete('image_url');
+    } else {
+        formData.delete('image');
+    }
     
     try {
         const response = await fetch(`${API_BASE_URL}/admin/products`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify(productData)
+            body: formData
         });
         
         const data = await response.json();
@@ -729,8 +737,10 @@ async function editProduct(productId) {
                     <input type="number" id="edit-product-price" name="price" step="0.01" value="${product.price}" required>
                 </div>
                 <div class="form-group">
-                    <label for="edit-product-image">URL изображения:</label>
-                    <input type="url" id="edit-product-image" name="image_url" value="${product.image_url}" required>
+                    <label for="edit-product-image">Изображение товара:</label>
+                    <input type="file" id="edit-product-image" name="image" accept="image/*">
+                    <small>Или укажите URL изображения:</small>
+                    <input type="url" id="edit-product-image-url" name="image_url" value="${product.image_url}" placeholder="https://example.com/image.jpg">
                 </div>
                 <div class="form-group">
                     <label for="edit-product-category">Категория:</label>
@@ -785,25 +795,25 @@ async function handleEditProduct(e) {
     
     const formData = new FormData(e.target);
     const productId = formData.get('product_id');
-    const productData = {
-        name: formData.get('name'),
-        description: formData.get('description'),
-        price: parseFloat(formData.get('price')),
-        image_url: formData.get('image_url'),
-        category: formData.get('category'),
-        size: formData.get('size'),
-        material: formData.get('material'),
-        density: formData.get('density')
-    };
+    
+    // Проверяем, есть ли файл изображения
+    const imageFile = formData.get('image');
+    const imageUrl = formData.get('image_url');
+    
+    // Если есть файл, убираем URL из FormData
+    if (imageFile.name) {
+        formData.delete('image_url');
+    } else {
+        formData.delete('image');
+    }
     
     try {
         const response = await fetch(`${API_BASE_URL}/admin/products/${productId}`, {
             method: 'PUT',
             headers: {
-                'Content-Type': 'application/json',
                 'Authorization': `Bearer ${authToken}`
             },
-            body: JSON.stringify(productData)
+            body: formData
         });
         
         const data = await response.json();

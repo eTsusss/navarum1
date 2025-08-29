@@ -124,9 +124,9 @@ def init_db():
         )
     ''')
     
-    # Добавляем тестовые данные для товаров ТОЛЬКО ПРИ ПЕРВОМ СОЗДАНИИ БАЗЫ
-    # Проверяем, существует ли файл базы данных
-    if not os.path.exists('products.db'):
+    # Добавляем тестовые данные для товаров, если таблица пустая
+    cursor.execute('SELECT COUNT(*) FROM products')
+    if cursor.fetchone()[0] == 0:
         products_data = [
             {
                 'name': 'Коллекция "Royal Comfort"',
