@@ -534,9 +534,32 @@ function showAddProductForm() {
                         <option value="Свитера">Свитера</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="product-size">Размер:</label>
-                    <input type="text" id="product-size" name="size">
+                
+                <!-- Динамические поля для размеров одежды -->
+                <div class="form-group" id="clothing-sizes" style="display: none;">
+                    <label>Размеры одежды:</label>
+                    <div class="size-options">
+                        <label><input type="checkbox" name="sizes" value="XS"> XS</label>
+                        <label><input type="checkbox" name="sizes" value="S"> S</label>
+                        <label><input type="checkbox" name="sizes" value="M"> M</label>
+                        <label><input type="checkbox" name="sizes" value="L"> L</label>
+                        <label><input type="checkbox" name="sizes" value="XL"> XL</label>
+                        <label><input type="checkbox" name="sizes" value="XXL"> XXL</label>
+                        <label><input type="checkbox" name="sizes" value="XXXL"> XXXL</label>
+                    </div>
+                </div>
+                
+                <!-- Поле для размеров полотенец -->
+                <div class="form-group" id="towel-sizes" style="display: none;">
+                    <label for="product-size">Размер полотенца:</label>
+                    <select id="product-size" name="size">
+                        <option value="">Выберите размер</option>
+                        <option value="50x90 см">50x90 см</option>
+                        <option value="70x140 см">70x140 см</option>
+                        <option value="80x150 см">80x150 см</option>
+                        <option value="100x150 см">100x150 см</option>
+                        <option value="120x180 см">120x180 см</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="product-material">Материал:</label>
@@ -571,6 +594,26 @@ function showAddProductForm() {
     });
     
     form.addEventListener('submit', handleAddProduct);
+    
+    // Обработчик изменения категории для показа соответствующих полей размеров
+    const categorySelect = modal.querySelector('#product-category');
+    const clothingSizes = modal.querySelector('#clothing-sizes');
+    const towelSizes = modal.querySelector('#towel-sizes');
+    
+    categorySelect.addEventListener('change', function() {
+        const selectedCategory = this.value;
+        
+        // Скрываем все поля размеров
+        clothingSizes.style.display = 'none';
+        towelSizes.style.display = 'none';
+        
+        // Показываем соответствующие поля в зависимости от категории
+        if (['Пальто', 'Куртки', 'Свитера'].includes(selectedCategory)) {
+            clothingSizes.style.display = 'block';
+        } else if (selectedCategory === 'Полотенца') {
+            towelSizes.style.display = 'block';
+        }
+    });
 }
 
 async function handleAddProduct(e) {
@@ -593,6 +636,14 @@ async function handleAddProduct(e) {
         formData.delete('image_url');
     } else {
         formData.delete('image');
+    }
+    
+    // Обрабатываем размеры одежды
+    const selectedSizes = formData.getAll('sizes');
+    if (selectedSizes.length > 0) {
+        // Удаляем старое поле size и добавляем новое с выбранными размерами
+        formData.delete('size');
+        formData.append('size', selectedSizes.join(', '));
     }
     
     try {
@@ -751,9 +802,32 @@ async function editProduct(productId) {
                         <option value="Свитера" ${product.category === 'Свитера' ? 'selected' : ''}>Свитера</option>
                     </select>
                 </div>
-                <div class="form-group">
-                    <label for="edit-product-size">Размер:</label>
-                    <input type="text" id="edit-product-size" name="size" value="${product.size || ''}">
+                
+                <!-- Динамические поля для размеров одежды -->
+                <div class="form-group" id="edit-clothing-sizes" style="display: none;">
+                    <label>Размеры одежды:</label>
+                    <div class="size-options">
+                        <label><input type="checkbox" name="sizes" value="XS" ${(product.size || '').includes('XS') ? 'checked' : ''}> XS</label>
+                        <label><input type="checkbox" name="sizes" value="S" ${(product.size || '').includes('S') ? 'checked' : ''}> S</label>
+                        <label><input type="checkbox" name="sizes" value="M" ${(product.size || '').includes('M') ? 'checked' : ''}> M</label>
+                        <label><input type="checkbox" name="sizes" value="L" ${(product.size || '').includes('L') ? 'checked' : ''}> L</label>
+                        <label><input type="checkbox" name="sizes" value="XL" ${(product.size || '').includes('XL') ? 'checked' : ''}> XL</label>
+                        <label><input type="checkbox" name="sizes" value="XXL" ${(product.size || '').includes('XXL') ? 'checked' : ''}> XXL</label>
+                        <label><input type="checkbox" name="sizes" value="XXXL" ${(product.size || '').includes('XXXL') ? 'checked' : ''}> XXXL</label>
+                    </div>
+                </div>
+                
+                <!-- Поле для размеров полотенец -->
+                <div class="form-group" id="edit-towel-sizes" style="display: none;">
+                    <label for="edit-product-size">Размер полотенца:</label>
+                    <select id="edit-product-size" name="size">
+                        <option value="">Выберите размер</option>
+                        <option value="50x90 см" ${product.size === '50x90 см' ? 'selected' : ''}>50x90 см</option>
+                        <option value="70x140 см" ${product.size === '70x140 см' ? 'selected' : ''}>70x140 см</option>
+                        <option value="80x150 см" ${product.size === '80x150 см' ? 'selected' : ''}>80x150 см</option>
+                        <option value="100x150 см" ${product.size === '100x150 см' ? 'selected' : ''}>100x150 см</option>
+                        <option value="120x180 см" ${product.size === '120x180 см' ? 'selected' : ''}>120x180 см</option>
+                    </select>
                 </div>
                 <div class="form-group">
                     <label for="edit-product-material">Материал:</label>
@@ -788,6 +862,34 @@ async function editProduct(productId) {
     });
     
     form.addEventListener('submit', handleEditProduct);
+    
+    // Обработчик изменения категории для показа соответствующих полей размеров
+    const categorySelect = modal.querySelector('#edit-product-category');
+    const clothingSizes = modal.querySelector('#edit-clothing-sizes');
+    const towelSizes = modal.querySelector('#edit-towel-sizes');
+    
+    // Показываем соответствующие поля при загрузке формы
+    const selectedCategory = categorySelect.value;
+    if (['Пальто', 'Куртки', 'Свитера'].includes(selectedCategory)) {
+        clothingSizes.style.display = 'block';
+    } else if (selectedCategory === 'Полотенца') {
+        towelSizes.style.display = 'block';
+    }
+    
+    categorySelect.addEventListener('change', function() {
+        const selectedCategory = this.value;
+        
+        // Скрываем все поля размеров
+        clothingSizes.style.display = 'none';
+        towelSizes.style.display = 'none';
+        
+        // Показываем соответствующие поля в зависимости от категории
+        if (['Пальто', 'Куртки', 'Свитера'].includes(selectedCategory)) {
+            clothingSizes.style.display = 'block';
+        } else if (selectedCategory === 'Полотенца') {
+            towelSizes.style.display = 'block';
+        }
+    });
 }
 
 async function handleEditProduct(e) {
@@ -805,6 +907,14 @@ async function handleEditProduct(e) {
         formData.delete('image_url');
     } else {
         formData.delete('image');
+    }
+    
+    // Обрабатываем размеры одежды
+    const selectedSizes = formData.getAll('sizes');
+    if (selectedSizes.length > 0) {
+        // Удаляем старое поле size и добавляем новое с выбранными размерами
+        formData.delete('size');
+        formData.append('size', selectedSizes.join(', '));
     }
     
     try {
