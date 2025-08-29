@@ -614,10 +614,11 @@ def get_products():
             'description': product[2],
             'price': product[3],
             'image_url': product[4],
-            'category': product[5],
-            'size': product[6],
-            'material': product[7],
-            'density': product[8]
+            'image_data': None,
+            'category': product[6],
+            'size': product[7],
+            'material': product[8],
+            'density': product[9]
         }
         
         # Если есть данные изображения, конвертируем в base64
@@ -650,10 +651,11 @@ def get_product(product_id):
             'description': product[2],
             'price': product[3],
             'image_url': product[4],
-            'category': product[5],
-            'size': product[6],
-            'material': product[7],
-            'density': product[8]
+            'image_data': None,
+            'category': product[6],
+            'size': product[7],
+            'material': product[8],
+            'density': product[9]
         }
         
         # Если есть данные изображения, конвертируем в base64
@@ -687,10 +689,11 @@ def get_products_by_category(category):
             'description': product[2],
             'price': product[3],
             'image_url': product[4],
-            'category': product[5],
-            'size': product[6],
-            'material': product[7],
-            'density': product[8]
+            'image_data': None,
+            'category': product[6],
+            'size': product[7],
+            'material': product[8],
+            'density': product[9]
         }
         
         # Если есть данные изображения, конвертируем в base64
