@@ -7,7 +7,7 @@ const config = {
     get apiUrl() {
         if (this.isProduction) {
             // В продакшене используем URL Render.com
-            return 'https://navarum-backend.onrender.com';
+            return 'https://navarum.onrender.com';
         } else {
             // В разработке используем локальный сервер
             return 'http://localhost:5000';

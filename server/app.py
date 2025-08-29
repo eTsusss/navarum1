@@ -6,19 +6,29 @@ import jwt
 import bcrypt
 from datetime import datetime, timedelta
 from functools import wraps
+from werkzeug.utils import secure_filename
+import base64
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'H,jVXSlcAknKoP0IsvMpxGhe.uYtZRT-')  # В продакшене используйте безопасный ключ
 
-# Настройка CORS для поддержки origin 'null' (файлы, открытые напрямую) и продакшн доменов
+# Настройка для загрузки файлов
+UPLOAD_FOLDER = 'uploads'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+if not os.path.exists(UPLOAD_FOLDER):
+    os.makedirs(UPLOAD_FOLDER)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+# Настройка CORS для продакшн доменов
 CORS(app, origins=[
-    'http://localhost:5000', 
-    'http://127.0.0.1:5000', 
-    'null',
     'https://www.navarum.site',
-    'https://navarum.site',
-    'http://www.navarum.site',
-    'http://navarum.site'
+    'https://navarum.site'
 ], supports_credentials=True, methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
 # Создание базы данных и таблицы
@@ -33,7 +43,8 @@ def init_db():
             name TEXT NOT NULL,
             description TEXT NOT NULL,
             price REAL NOT NULL,
-            image_url TEXT NOT NULL,
+            image_url TEXT,
+            image_data BLOB,
             category TEXT NOT NULL,
             size TEXT,
             material TEXT,
@@ -113,9 +124,9 @@ def init_db():
         )
     ''')
     
-    # Добавляем тестовые данные для товаров, если таблица пустая
-    cursor.execute('SELECT COUNT(*) FROM products')
-    if cursor.fetchone()[0] == 0:
+    # Добавляем тестовые данные для товаров ТОЛЬКО ПРИ ПЕРВОМ СОЗДАНИИ БАЗЫ
+    # Проверяем, существует ли файл базы данных
+    if not os.path.exists('products.db'):
         products_data = [
             {
                 'name': 'Коллекция "Royal Comfort"',
@@ -146,36 +157,6 @@ def init_db():
                 'size': '80x150 см',
                 'material': '100% египетский хлопок',
                 'density': '700 г/м²'
-            },
-            {
-                'name': 'Полотенце "Bamboo Luxury"',
-                'description': 'Экологичные полотенца из бамбукового волокна. Невероятно мягкие и быстро сохнущие.',
-                'price': 2800.0,
-                'image_url': 'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-                'category': 'Полотенца',
-                'size': '70x140 см',
-                'material': '100% бамбуковое волокно',
-                'density': '450 г/м²'
-            },
-            {
-                'name': 'Полотенце "Velvet Touch"',
-                'description': 'Бархатистые полотенца с особой текстурой. Максимальная впитываемость и комфорт.',
-                'price': 2200.0,
-                'image_url': 'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-                'category': 'Полотенца',
-                'size': '75x150 см',
-                'material': '100% хлопок',
-                'density': '550 г/м²'
-            },
-            {
-                'name': 'Полотенце "Ocean Fresh"',
-                'description': 'Свежие цвета и приятная текстура. Идеально для ванной комнаты и пляжа.',
-                'price': 1900.0,
-                'image_url': 'https://images.unsplash.com/photo-1582735689369-4fe89db7114c?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-                'category': 'Полотенца',
-                'size': '70x140 см',
-                'material': '100% хлопок',
-                'density': '500 г/м²'
             }
         ]
         
@@ -471,20 +452,47 @@ def get_profile(current_user):
 @admin_required
 def add_product(current_user):
     """Добавить новый товар (только для администратора)"""
-    data = request.get_json()
+    # Проверяем, есть ли файл изображения
+    image_data = None
+    image_url = None
+    
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and allowed_file(file.filename):
+            # Сохраняем файл
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Читаем файл как BLOB для сохранения в БД
+            with open(filepath, 'rb') as f:
+                image_data = f.read()
+            
+            # Удаляем временный файл
+            os.remove(filepath)
+    
+    # Получаем данные из формы или JSON
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form.to_dict()
     
     if not data or not data.get('name') or not data.get('description') or not data.get('price'):
         return jsonify({'error': 'Необходимо указать name, description и price'}), 400
+    
+    # Если нет загруженного файла, используем URL
+    if not image_data:
+        image_url = data.get('image_url', '')
     
     conn = sqlite3.connect('products.db')
     cursor = conn.cursor()
     
     cursor.execute('''
-        INSERT INTO products (name, description, price, image_url, category, size, material, density)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO products (name, description, price, image_url, image_data, category, size, material, density)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         data['name'], data['description'], data['price'],
-        data.get('image_url', ''), data.get('category', ''),
+        image_url, image_data, data.get('category', ''),
         data.get('size', ''), data.get('material', ''), data.get('density', '')
     ))
     
@@ -502,7 +510,30 @@ def add_product(current_user):
 @admin_required
 def update_product(current_user, product_id):
     """Обновить товар (только для администратора)"""
-    data = request.get_json()
+    # Проверяем, есть ли файл изображения
+    image_data = None
+    image_url = None
+    
+    if 'image' in request.files:
+        file = request.files['image']
+        if file and allowed_file(file.filename):
+            # Сохраняем файл
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            
+            # Читаем файл как BLOB для сохранения в БД
+            with open(filepath, 'rb') as f:
+                image_data = f.read()
+            
+            # Удаляем временный файл
+            os.remove(filepath)
+    
+    # Получаем данные из формы или JSON
+    if request.is_json:
+        data = request.get_json()
+    else:
+        data = request.form.to_dict()
     
     conn = sqlite3.connect('products.db')
     cursor = conn.cursor()
@@ -513,16 +544,31 @@ def update_product(current_user, product_id):
         conn.close()
         return jsonify({'error': 'Товар не найден'}), 404
     
+    # Если нет загруженного файла, используем URL
+    if not image_data:
+        image_url = data.get('image_url', '')
+    
     # Обновляем товар
-    cursor.execute('''
-        UPDATE products 
-        SET name = ?, description = ?, price = ?, image_url = ?, category = ?, size = ?, material = ?, density = ?
-        WHERE id = ?
-    ''', (
-        data.get('name'), data.get('description'), data.get('price'),
-        data.get('image_url'), data.get('category'), data.get('size'),
-        data.get('material'), data.get('density'), product_id
-    ))
+    if image_data:
+        cursor.execute('''
+            UPDATE products 
+            SET name = ?, description = ?, price = ?, image_url = ?, image_data = ?, category = ?, size = ?, material = ?, density = ?
+            WHERE id = ?
+        ''', (
+            data.get('name'), data.get('description'), data.get('price'),
+            image_url, image_data, data.get('category'), data.get('size'),
+            data.get('material'), data.get('density'), product_id
+        ))
+    else:
+        cursor.execute('''
+            UPDATE products 
+            SET name = ?, description = ?, price = ?, image_url = ?, category = ?, size = ?, material = ?, density = ?
+            WHERE id = ?
+        ''', (
+            data.get('name'), data.get('description'), data.get('price'),
+            image_url, data.get('category'), data.get('size'),
+            data.get('material'), data.get('density'), product_id
+        ))
     
     conn.commit()
     conn.close()
@@ -562,7 +608,7 @@ def get_products():
     
     products_list = []
     for product in products:
-        products_list.append({
+        product_data = {
             'id': product[0],
             'name': product[1],
             'description': product[2],
@@ -572,7 +618,17 @@ def get_products():
             'size': product[6],
             'material': product[7],
             'density': product[8]
-        })
+        }
+        
+        # Если есть данные изображения, конвертируем в base64
+        if product[5]:  # image_data
+            try:
+                image_base64 = base64.b64encode(product[5]).decode('utf-8')
+                product_data['image_data'] = image_base64
+            except:
+                pass
+        
+        products_list.append(product_data)
     
     return jsonify(products_list)
 
@@ -588,7 +644,7 @@ def get_product(product_id):
     conn.close()
     
     if product:
-        return jsonify({
+        product_data = {
             'id': product[0],
             'name': product[1],
             'description': product[2],
@@ -598,7 +654,17 @@ def get_product(product_id):
             'size': product[6],
             'material': product[7],
             'density': product[8]
-        })
+        }
+        
+        # Если есть данные изображения, конвертируем в base64
+        if product[5]:  # image_data
+            try:
+                image_base64 = base64.b64encode(product[5]).decode('utf-8')
+                product_data['image_data'] = image_base64
+            except:
+                pass
+        
+        return jsonify(product_data)
     else:
         return jsonify({'error': 'Товар не найден'}), 404
 
@@ -615,7 +681,7 @@ def get_products_by_category(category):
     
     products_list = []
     for product in products:
-        products_list.append({
+        product_data = {
             'id': product[0],
             'name': product[1],
             'description': product[2],
@@ -625,7 +691,17 @@ def get_products_by_category(category):
             'size': product[6],
             'material': product[7],
             'density': product[8]
-        })
+        }
+        
+        # Если есть данные изображения, конвертируем в base64
+        if product[5]:  # image_data
+            try:
+                image_base64 = base64.b64encode(product[5]).decode('utf-8')
+                product_data['image_data'] = image_base64
+            except:
+                pass
+        
+        products_list.append(product_data)
     
     return jsonify(products_list)
 
