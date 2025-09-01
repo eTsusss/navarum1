@@ -555,8 +555,7 @@ function showAddProductForm() {
                     <select id="product-category" name="category" required>
                         <option value="">Выберите категорию</option>
                         <option value="Полотенца">Полотенца</option>
-                        <option value="Пальто">Пальто</option>
-                        <option value="Куртки">Куртки</option>
+                        <option value="Футболки">Футболки</option>
                         <option value="Свитера">Свитера</option>
                     </select>
                 </div>
@@ -634,7 +633,7 @@ function showAddProductForm() {
         towelSizes.style.display = 'none';
         
         // Показываем соответствующие поля в зависимости от категории
-        if (['Пальто', 'Куртки', 'Свитера'].includes(selectedCategory)) {
+        if (['Футболки', 'Свитера'].includes(selectedCategory)) {
             clothingSizes.style.display = 'block';
         } else if (selectedCategory === 'Полотенца') {
             towelSizes.style.display = 'block';
@@ -838,8 +837,7 @@ async function editProduct(productId) {
                     <label for="edit-product-category">Категория:</label>
                     <select id="edit-product-category" name="category" required>
                         <option value="Полотенца" ${product.category === 'Полотенца' ? 'selected' : ''}>Полотенца</option>
-                        <option value="Пальто" ${product.category === 'Пальто' ? 'selected' : ''}>Пальто</option>
-                        <option value="Куртки" ${product.category === 'Куртки' ? 'selected' : ''}>Куртки</option>
+                        <option value="Футболки" ${product.category === 'Футболки' ? 'selected' : ''}>Футболки</option>
                         <option value="Свитера" ${product.category === 'Свитера' ? 'selected' : ''}>Свитера</option>
                     </select>
                 </div>
@@ -911,7 +909,7 @@ async function editProduct(productId) {
     
     // Показываем соответствующие поля при загрузке формы
     const selectedCategory = categorySelect.value;
-    if (['Пальто', 'Куртки', 'Свитера'].includes(selectedCategory)) {
+    if (['Футболки', 'Свитера'].includes(selectedCategory)) {
         clothingSizes.style.display = 'block';
     } else if (selectedCategory === 'Полотенца') {
         towelSizes.style.display = 'block';
@@ -925,7 +923,7 @@ async function editProduct(productId) {
         towelSizes.style.display = 'none';
         
         // Показываем соответствующие поля в зависимости от категории
-        if (['Пальто', 'Куртки', 'Свитера'].includes(selectedCategory)) {
+        if (['Футболки', 'Свитера'].includes(selectedCategory)) {
             clothingSizes.style.display = 'block';
         } else if (selectedCategory === 'Полотенца') {
             towelSizes.style.display = 'block';

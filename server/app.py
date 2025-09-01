@@ -212,8 +212,7 @@ def init_db():
             # Фильтры
             ('filters', 'all_products', 'Все товары', 'text'),
             ('filters', 'towels', 'Полотенца', 'text'),
-            ('filters', 'coats', 'Пальто', 'text'),
-            ('filters', 'jackets', 'Куртки', 'text'),
+            ('filters', 'coats', 'Футболки', 'text'),
             ('filters', 'sweaters', 'Свитера', 'text'),
             
             # Футер
@@ -267,8 +266,7 @@ def init_db():
             
             # Категории товаров
             ('categories', 'towels', 'Полотенца', 'text'),
-            ('categories', 'coats', 'Пальто', 'text'),
-            ('categories', 'jackets', 'Куртки', 'text'),
+            ('categories', 'coats', 'Футболки', 'text'),
             ('categories', 'sweaters', 'Свитера', 'text'),
             ('categories', 'robes', 'Халаты', 'text')
         ]

@@ -338,10 +338,9 @@ class ContentManager {
             },
             'filters': {
                 'all_products': '.filter-btn[data-category="all"]',
-                'towels': '.filter-btn[data-category="towels"]',
-                'coats': '.filter-btn[data-category="coats"]',
-                'jackets': '.filter-btn[data-category="jackets"]',
-                'sweaters': '.filter-btn[data-category="sweaters"]'
+                'towels': '.filter-btn[data-category="Полотенца"]',
+                'coats': '.filter-btn[data-category="Футболки"]',
+                'sweaters': '.filter-btn[data-category="Свитера"]'
             }
         };
 
