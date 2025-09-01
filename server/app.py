@@ -35,16 +35,16 @@ CORS(app, origins=[
 def get_db_path():
     # Пробуем несколько вариантов путей для Render.com
     possible_paths = [
-        # Создаем собственную постоянную директорию в домашней папке пользователя
-        os.path.expanduser('~/navarum_db'),
-        os.path.expanduser('~/.navarum'),
+        # Системные временные директории (наиболее стабильные)
+        '/tmp/navarum_db',
+        '/var/tmp/navarum_db',
         # Системные переменные окружения
         os.environ.get('TMPDIR', ''),
         os.environ.get('TEMP', ''),
         os.environ.get('TMP', ''),
-        # Системные директории
-        '/tmp',
-        '/var/tmp',
+        # Создаем собственную постоянную директорию в домашней папке пользователя
+        os.path.expanduser('~/navarum_db'),
+        os.path.expanduser('~/.navarum'),
         # Стандартные пути Render.com
         os.environ.get('RENDER_PROJECT_DIR', ''),
         os.environ.get('RENDER_PROJECT_ROOT', ''),
@@ -93,7 +93,10 @@ def init_db():
             cursor = conn.cursor()
             cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
             if cursor.fetchone():
-                print(f"Таблица products найдена в существующей БД - БД уже инициализирована")
+                # Дополнительная проверка - есть ли данные в таблице
+                cursor.execute("SELECT COUNT(*) FROM products")
+                product_count = cursor.fetchone()[0]
+                print(f"Таблица products найдена в существующей БД с {product_count} товарами - БД уже инициализирована")
                 conn.close()
                 return  # БД уже инициализирована, выходим
             else:
