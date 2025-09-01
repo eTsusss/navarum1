@@ -82,30 +82,33 @@ def init_db():
     db_path = get_db_path()
     print(f"Подключаемся к базе данных: {db_path}")
     
-    # Пытаемся подключиться к существующей базе данных
-    try:
-        conn = sqlite3.connect(db_path)
-        print(f"База данных успешно подключена: {db_path}")
-        
-        # Проверяем, есть ли таблицы в БД
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
-        if cursor.fetchone():
-            print(f"Таблица products найдена в существующей БД")
-            conn.close()
-            return  # БД уже инициализирована, выходим
-        else:
-            print(f"Таблица products не найдена, инициализируем БД")
-            conn.close()
-    except Exception as e:
-        print(f"Ошибка подключения к БД: {e}")
-        # Если файл поврежден, удаляем его
-        if os.path.exists(db_path):
+    # Проверяем, существует ли файл БД
+    if os.path.exists(db_path):
+        print(f"Файл БД существует: {db_path}")
+        try:
+            conn = sqlite3.connect(db_path)
+            print(f"База данных успешно подключена: {db_path}")
+            
+            # Проверяем, есть ли таблицы в БД
+            cursor = conn.cursor()
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
+            if cursor.fetchone():
+                print(f"Таблица products найдена в существующей БД - БД уже инициализирована")
+                conn.close()
+                return  # БД уже инициализирована, выходим
+            else:
+                print(f"Таблица products не найдена в существующей БД")
+                conn.close()
+        except Exception as e:
+            print(f"Ошибка подключения к существующей БД: {e}")
+            # Если файл поврежден, удаляем его
             try:
                 os.remove(db_path)
                 print(f"Удален поврежденный файл БД: {db_path}")
             except Exception as del_e:
                 print(f"Ошибка удаления поврежденного файла: {del_e}")
+    else:
+        print(f"Файл БД не существует: {db_path}")
     
     # Создаем новую базу данных
     print(f"Создаем новую базу данных: {db_path}")
