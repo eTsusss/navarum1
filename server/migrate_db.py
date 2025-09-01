@@ -7,6 +7,9 @@
 import sqlite3
 import os
 
+def get_db_path():
+    return os.path.join(os.environ.get('RENDER_PROJECT_DIR', '.'), 'products.db')
+
 def migrate_database():
     """Миграция базы данных для добавления поля image_data"""
     
@@ -14,7 +17,7 @@ def migrate_database():
         print("База данных не найдена. Создайте её сначала.")
         return
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     try:

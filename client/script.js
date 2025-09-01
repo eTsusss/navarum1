@@ -376,11 +376,27 @@ function displayProducts(products) {
         const imageCount = product.images ? product.images.length : 0;
         const imageIndicator = imageCount > 1 ? `<div class="image-count">+${imageCount - 1}</div>` : '';
         
+        // Добавляем навигацию по фото, если их больше одного
+        let imageNavigation = '';
+        if (imageCount > 1) {
+            imageNavigation = `
+                <div class="card-image-navigation">
+                    <button class="card-nav-btn prev-btn" data-product-id="${product.id}" data-direction="-1">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button class="card-nav-btn next-btn" data-product-id="${product.id}" data-direction="1">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            `;
+        }
+        
         return `
-            <div class="product-card" data-product-id="${product.id}">
+            <div class="product-card" data-product-id="${product.id}" data-current-image="0">
                 <div class="product-image">
                     <img src="${imageSrc}" alt="${product.name}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+RXJyb3I8L3RleHQ+PC9zdmc+';">
                     ${imageIndicator}
+                    ${imageNavigation}
                     <div class="overlay">
                         <button class="view-button">Подробнее</button>
                     </div>
@@ -396,12 +412,29 @@ function displayProducts(products) {
     
     // Добавляем обработчики для карточек товаров
     document.querySelectorAll('.product-card').forEach(card => {
-        card.addEventListener('click', function() {
+        card.addEventListener('click', function(e) {
+            // Проверяем, не кликнули ли мы по кнопке навигации
+            if (e.target.closest('.card-nav-btn')) {
+                e.stopPropagation();
+                return;
+            }
+            
             const productId = this.dataset.productId;
             const product = allProducts.find(p => p.id == productId);
             if (product) {
                 showProductModal(product);
             }
+        });
+        
+        // Добавляем обработчики для кнопок навигации
+        const navButtons = card.querySelectorAll('.card-nav-btn');
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const productId = this.dataset.productId;
+                const direction = parseInt(this.dataset.direction);
+                changeCardImage(productId, direction);
+            });
         });
     });
 }
@@ -482,6 +515,10 @@ function showProductModal(product) {
     const images = product.images || [];
     let currentImageIndex = 0;
     
+    console.log('Товар:', product.name);
+    console.log('Изображения товара:', images);
+    console.log('Количество изображений:', images.length);
+    
     // Функция для обновления изображения
     function updateModalImage() {
         if (images.length > 0) {
@@ -502,61 +539,94 @@ function showProductModal(product) {
     
     // Добавляем навигацию по изображениям, если их больше одного
     if (images.length > 1) {
-        // Создаем навигацию
-        let navigationHTML = `
-            <div class="image-navigation">
-                <button class="nav-btn prev-btn" onclick="changeImage(-1)">
-                    <i class="fas fa-chevron-left"></i>
-                </button>
-                <div class="image-counter">${currentImageIndex + 1} / ${images.length}</div>
-                <button class="nav-btn next-btn" onclick="changeImage(1)">
-                    <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-            <div class="image-thumbnails">
-        `;
+        console.log('Добавляем навигацию для', images.length, 'изображений');
         
-        images.forEach((img, index) => {
-            const thumbSrc = img.data ? `data:image/jpeg;base64,${img.data}` : img.url;
-            navigationHTML += `
-                <div class="thumbnail ${index === 0 ? 'active' : ''}" onclick="goToImage(${index})">
-                    <img src="${thumbSrc}" alt="Фото ${index + 1}">
-                </div>
-            `;
-        });
+        // Показываем существующие элементы навигации
+        const existingNav = modal.querySelector('.image-navigation');
+        const existingThumbnails = modal.querySelector('.image-thumbnails');
         
-        navigationHTML += '</div>';
-        
-        // Вставляем навигацию после изображения
-        const imageContainer = modal.querySelector('.modal-image-container');
-        const existingNav = imageContainer.querySelector('.image-navigation');
-        if (existingNav) {
-            existingNav.remove();
-        }
-        imageContainer.insertAdjacentHTML('beforeend', navigationHTML);
-        
-        // Добавляем глобальные функции для навигации
-        window.changeImage = function(direction) {
-            currentImageIndex = (currentImageIndex + direction + images.length) % images.length;
-            updateModalImage();
-            updateNavigation();
-        };
-        
-        window.goToImage = function(index) {
-            currentImageIndex = index;
-            updateModalImage();
-            updateNavigation();
-        };
-        
-        function updateNavigation() {
-            const counter = modal.querySelector('.image-counter');
-            const thumbnails = modal.querySelectorAll('.thumbnail');
+        if (existingNav && existingThumbnails) {
+            console.log('Показываем существующую навигацию');
             
-            if (counter) counter.textContent = `${currentImageIndex + 1} / ${images.length}`;
-            thumbnails.forEach((thumb, index) => {
-                thumb.classList.toggle('active', index === currentImageIndex);
+            // Показываем навигацию
+            existingNav.style.display = 'flex';
+            existingThumbnails.style.display = 'flex';
+            
+            // Обновляем счетчик
+            const counter = existingNav.querySelector('.image-counter');
+            if (counter) {
+                counter.textContent = `${currentImageIndex + 1} / ${images.length}`;
+            }
+            
+            // Очищаем и заполняем миниатюры
+            existingThumbnails.innerHTML = '';
+            images.forEach((img, index) => {
+                const thumbSrc = img.data ? `data:image/jpeg;base64,${img.data}` : img.url;
+                const thumbnail = document.createElement('div');
+                thumbnail.className = `thumbnail ${index === 0 ? 'active' : ''}`;
+                thumbnail.dataset.index = index;
+                thumbnail.innerHTML = `<img src="${thumbSrc}" alt="Фото ${index + 1}">`;
+                
+                thumbnail.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    currentImageIndex = index;
+                    updateModalImage();
+                    updateNavigation();
+                });
+                
+                existingThumbnails.appendChild(thumbnail);
             });
+            
+            // Добавляем обработчики событий для кнопок навигации
+            const prevBtn = existingNav.querySelector('.nav-btn[data-direction="-1"]');
+            const nextBtn = existingNav.querySelector('.nav-btn[data-direction="1"]');
+            
+            console.log('Кнопки навигации найдены:', { prevBtn: !!prevBtn, nextBtn: !!nextBtn });
+            
+            if (prevBtn) {
+                prevBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    currentImageIndex = (currentImageIndex - 1 + images.length) % images.length;
+                    updateModalImage();
+                    updateNavigation();
+                });
+            }
+            
+            if (nextBtn) {
+                nextBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    currentImageIndex = (currentImageIndex + 1) % images.length;
+                    updateModalImage();
+                    updateNavigation();
+                });
+            }
+            
+            function updateNavigation() {
+                const counter = existingNav.querySelector('.image-counter');
+                if (counter) {
+                    counter.textContent = `${currentImageIndex + 1} / ${images.length}`;
+                }
+                
+                const thumbnails = existingThumbnails.querySelectorAll('.thumbnail');
+                thumbnails.forEach((thumb, index) => {
+                    if (thumb) {
+                        thumb.classList.toggle('active', index === currentImageIndex);
+                    }
+                });
+            }
+        } else {
+            console.error('Элементы навигации не найдены в HTML!');
         }
+    } else {
+        console.log('Изображений меньше 2, навигация не нужна');
+        // Скрываем навигацию если изображений мало
+        const existingNav = modal.querySelector('.image-navigation');
+        const existingThumbnails = modal.querySelector('.image-thumbnails');
+        if (existingNav) existingNav.style.display = 'none';
+        if (existingThumbnails) existingThumbnails.style.display = 'none';
     }
     
     modalImage.alt = product.name;
@@ -570,6 +640,40 @@ function showProductModal(product) {
     
     modal.classList.add('active');
     document.body.style.overflow = 'hidden';
+}
+
+// Функция для смены изображений в карточках товаров
+function changeCardImage(productId, direction) {
+    const productCard = document.querySelector(`[data-product-id="${productId}"]`);
+    if (!productCard) return;
+    
+    const product = allProducts.find(p => p.id == productId);
+    if (!product || !product.images || product.images.length <= 1) return;
+    
+    let currentIndex = parseInt(productCard.dataset.currentImage) || 0;
+    const totalImages = product.images.length;
+    
+    // Вычисляем новый индекс
+    currentIndex = (currentIndex + direction + totalImages) % totalImages;
+    
+    // Обновляем изображение
+    const img = productCard.querySelector('.product-image img');
+    const currentImage = product.images[currentIndex];
+    
+    if (currentImage.data) {
+        img.src = `data:image/jpeg;base64,${currentImage.data}`;
+    } else if (currentImage.url) {
+        img.src = currentImage.url;
+    }
+    
+    // Обновляем атрибут текущего изображения
+    productCard.dataset.currentImage = currentIndex;
+    
+    // Обновляем индикатор количества фото
+    const imageCount = productCard.querySelector('.image-count');
+    if (imageCount) {
+        imageCount.textContent = `+${totalImages - 1}`;
+    }
 }
 
 // Animation on Scroll
@@ -705,6 +809,28 @@ function showAddProductForm() {
     
     form.addEventListener('submit', handleAddProduct);
     
+    // Обработчик предварительного просмотра изображений
+    const imageInput = modal.querySelector('#product-images');
+    const imagePreview = modal.querySelector('#image-preview');
+    
+    imageInput.addEventListener('change', function() {
+        imagePreview.innerHTML = '';
+        const files = Array.from(this.files);
+        
+        files.forEach((file, index) => {
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const img = document.createElement('img');
+                    img.src = e.target.result;
+                    img.alt = `Предварительный просмотр ${index + 1}`;
+                    imagePreview.appendChild(img);
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    });
+    
     // Обработчик изменения категории для показа соответствующих полей размеров
     const categorySelect = modal.querySelector('#product-category');
     const clothingSizes = modal.querySelector('#clothing-sizes');
@@ -734,21 +860,24 @@ async function handleAddProduct(e) {
     
     const formData = new FormData(e.target);
     
-    // Проверяем, есть ли файл изображения
-    const imageFile = formData.get('image');
-    const imageUrl = formData.get('image_url');
+    // Проверяем, есть ли файлы изображений
+    const imageFiles = formData.getAll('images');
+    const imageUrls = formData.get('image_urls');
     
-    // Если нет ни файла, ни URL, показываем ошибку
-    if (!imageFile.name && !imageUrl) {
-        showNotification('Необходимо указать изображение товара (файл или URL)', 'error');
+    // Проверяем, что есть хотя бы одно изображение
+    const hasFiles = imageFiles.some(file => file.name);
+    const hasUrls = imageUrls && imageUrls.trim();
+    
+    if (!hasFiles && !hasUrls) {
+        showNotification('Необходимо указать хотя бы одно изображение товара (файлы или URL)', 'error');
         return;
     }
     
-    // Если есть файл, убираем URL из FormData
-    if (imageFile.name) {
-        formData.delete('image_url');
+    // Если есть файлы, убираем URL из FormData
+    if (hasFiles) {
+        formData.delete('image_urls');
     } else {
-        formData.delete('image');
+        formData.delete('images');
     }
     
     // Обрабатываем размеры одежды

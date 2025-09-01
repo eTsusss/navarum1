@@ -31,9 +31,13 @@ CORS(app, origins=[
     'https://navarum.site'
 ], supports_credentials=True, methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
+# Функция для получения пути к базе данных
+def get_db_path():
+    return os.path.join(os.environ.get('RENDER_PROJECT_DIR', '.'), 'products.db')
+
 # Создание базы данных и таблицы
 def init_db():
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     # Таблица товаров
@@ -380,7 +384,7 @@ def admin_required(f):
 #     # Хешируем пароль
 #     password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 #     
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     try:
@@ -430,7 +434,7 @@ def login():
     username = data['username']
     password = data['password']
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT id, username, email, password_hash, role FROM users WHERE username = ?', (username,))
@@ -530,7 +534,7 @@ def add_product(current_user):
     if not images:
         return jsonify({'error': 'Необходимо указать хотя бы одно изображение товара (файлы или URL)'}), 400
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     try:
@@ -608,7 +612,7 @@ def update_product(current_user, product_id):
     else:
         data = request.form.to_dict()
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     # Проверяем, существует ли товар
@@ -662,7 +666,7 @@ def update_product(current_user, product_id):
 @admin_required
 def delete_product(current_user, product_id):
     """Удалить товар (только для администратора)"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     # Проверяем, существует ли товар
@@ -680,7 +684,7 @@ def delete_product(current_user, product_id):
 @app.route('/api/products', methods=['GET'])
 def get_products():
     """Получить все товары с множественными изображениями"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT * FROM products')
@@ -759,7 +763,7 @@ def get_products():
 @app.route('/api/products/<int:product_id>', methods=['GET'])
 def get_product(product_id):
     """Получить товар по ID"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
@@ -796,7 +800,7 @@ def get_product(product_id):
 @app.route('/api/products/category/<category>', methods=['GET'])
 def get_products_by_category(category):
     """Получить товары по категории"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT * FROM products WHERE category = ?', (category,))
@@ -834,7 +838,7 @@ def get_products_by_category(category):
 @app.route('/api/categories', methods=['GET'])
 def get_categories():
     """Получить все категории"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT DISTINCT category FROM products')
@@ -851,7 +855,7 @@ def get_categories():
 # @token_required
 # def get_cart(current_user):
 #     """Получить корзину пользователя"""
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     cursor.execute('''
@@ -899,7 +903,7 @@ def get_categories():
 #     if not product_id:
 #         return jsonify({'error': 'ID товара обязателен'}), 400
 #     
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     # Проверяем, есть ли товар в корзине
@@ -936,7 +940,7 @@ def get_categories():
 #     if quantity <= 0:
 #         return jsonify({'error': 'Количество должно быть больше 0'}), 400
 #     
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     # Проверяем, принадлежит ли элемент корзины пользователю
@@ -963,7 +967,7 @@ def get_categories():
 #     if not cart_item_id:
 #         return jsonify({'error': 'ID элемента корзины обязателен'}), 400
 #     
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     # Проверяем, принадлежит ли элемент корзины пользователю
@@ -982,7 +986,7 @@ def get_categories():
 # @token_required
 # def clear_cart(current_user):
 #     """Очистить корзину пользователя"""
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     cursor.execute('DELETE FROM cart_items WHERE user_id = ?', (current_user['id'],))
@@ -1003,7 +1007,7 @@ def get_categories():
 #     if not payment_method:
 #         return jsonify({'error': 'Способ оплаты обязателен'}), 400
 #     
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     # Получаем корзину пользователя
@@ -1091,7 +1095,7 @@ def get_categories():
 # @token_required
 # def get_orders(current_user):
 #     """Получить заказы пользователя"""
-#     conn = sqlite3.connect('products.db')
+#     conn = sqlite3.connect(get_db_path())
 #     cursor = conn.cursor()
 #     
 #     cursor.execute('''
@@ -1121,7 +1125,7 @@ def get_categories():
 @token_required
 def get_user_profile(current_user):
     """Получить профиль пользователя"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('''
@@ -1159,7 +1163,7 @@ def update_user_profile(current_user):
     if not data:
         return jsonify({'error': 'Данные не предоставлены'}), 400
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     # Обновляем только разрешенные поля
@@ -1191,7 +1195,7 @@ def update_password(current_user):
     if not data or not data.get('current_password') or not data.get('new_password'):
         return jsonify({'error': 'Текущий и новый пароль обязательны'}), 400
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     # Проверяем текущий пароль
@@ -1221,7 +1225,7 @@ def update_password(current_user):
 @app.route('/api/content', methods=['GET'])
 def get_page_content():
     """Получить весь контент страницы"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT section_name, content_key, content_value, content_type FROM page_content ORDER BY section_name, content_key')
@@ -1245,7 +1249,7 @@ def get_page_content():
 @app.route('/api/content/<section>/<key>', methods=['GET'])
 def get_content_item(section, key):
     """Получить конкретный элемент контента"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT content_value, content_type FROM page_content WHERE section_name = ? AND content_key = ?', (section, key))
@@ -1276,7 +1280,7 @@ def update_content_item(current_user, section, key):
     new_value = data['value']
     content_type = data.get('type', 'text')
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     # Проверяем, существует ли элемент
@@ -1318,7 +1322,7 @@ def update_content_batch(current_user):
     if not data or not isinstance(data, dict):
         return jsonify({'error': 'Необходимо передать объект с данными'}), 400
     
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     updated_items = []
@@ -1366,7 +1370,7 @@ def update_content_batch(current_user):
 @app.route('/api/content/sections', methods=['GET'])
 def get_content_sections():
     """Получить список всех секций контента"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT DISTINCT section_name FROM page_content ORDER BY section_name')
@@ -1379,7 +1383,7 @@ def get_content_sections():
 @app.route('/api/content/section/<section>', methods=['GET'])
 def get_section_content(section):
     """Получить весь контент конкретной секции"""
-    conn = sqlite3.connect('products.db')
+    conn = sqlite3.connect(get_db_path())
     cursor = conn.cursor()
     
     cursor.execute('SELECT content_key, content_value, content_type FROM page_content WHERE section_name = ? ORDER BY content_key', (section,))

@@ -7,14 +7,25 @@
 import sqlite3
 import os
 
+def get_db_path():
+    return os.path.join(os.environ.get('RENDER_PROJECT_DIR', '.'), 'products.db')
+
 def update_categories():
     """Обновляет категории в базе данных для новых 6 категорий"""
     
     # Подключаемся к базе данных
-    db_path = 'products.db'
+    db_path = get_db_path()
     if not os.path.exists(db_path):
         print(f"База данных {db_path} не найдена!")
-        return
+        print("Создаем новую базу данных...")
+        # Создаем директорию если её нет
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        # Импортируем функцию init_db из app.py
+        import sys
+        sys.path.append('.')
+        from app import init_db
+        init_db()
+        print("База данных создана!")
     
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
