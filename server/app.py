@@ -33,11 +33,41 @@ CORS(app, origins=[
 
 # Функция для получения пути к базе данных
 def get_db_path():
-    return os.path.join(os.environ.get('RENDER_PROJECT_DIR', '.'), 'products.db')
+    db_dir = os.environ.get('RENDER_PROJECT_DIR', '.')
+    # Создаем директорию если её нет
+    if not os.path.exists(db_dir):
+        try:
+            os.makedirs(db_dir, exist_ok=True)
+            print(f"Создана директория для БД: {db_dir}")
+        except Exception as e:
+            print(f"Ошибка создания директории {db_dir}: {e}")
+            # Fallback на текущую директорию
+            db_dir = '.'
+    
+    db_path = os.path.join(db_dir, 'products.db')
+    print(f"Путь к базе данных: {db_path}")
+    return db_path
 
 # Создание базы данных и таблицы
 def init_db():
-    conn = sqlite3.connect(get_db_path())
+    try:
+        db_path = get_db_path()
+        print(f"Подключаемся к базе данных: {db_path}")
+        
+        # Проверяем права на запись в директорию
+        db_dir = os.path.dirname(db_path)
+        if not os.access(db_dir, os.W_OK):
+            print(f"Нет прав на запись в директорию: {db_dir}")
+            print("Используем текущую директорию")
+            db_path = 'products.db'
+        
+        conn = sqlite3.connect(db_path)
+        print(f"База данных успешно подключена: {db_path}")
+    except Exception as e:
+        print(f"Ошибка подключения к БД: {e}")
+        print("Используем текущую директорию")
+        db_path = 'products.db'
+        conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
     # Таблица товаров
