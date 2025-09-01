@@ -1,6 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import sqlite3
+import psycopg2
+import psycopg2.extras
 import os
 import jwt
 import bcrypt
@@ -8,6 +10,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from werkzeug.utils import secure_filename
 import base64
+import urllib.parse as urlparse
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'H,jVXSlcAknKoP0IsvMpxGhe.uYtZRT-')  # В продакшене используйте безопасный ключ
@@ -31,202 +34,298 @@ CORS(app, origins=[
     'https://navarum.site'
 ], supports_credentials=True, methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
 
-# Функция для получения пути к базе данных
-def get_db_path():
-    # Пробуем несколько вариантов путей для Render.com
-    possible_paths = [
-        # Системные временные директории (наиболее стабильные)
-        '/tmp/navarum_db',
-        '/var/tmp/navarum_db',
-        # Системные переменные окружения
-        os.environ.get('TMPDIR', ''),
-        os.environ.get('TEMP', ''),
-        os.environ.get('TMP', ''),
-        # Создаем собственную постоянную директорию в домашней папке пользователя
-        os.path.expanduser('~/navarum_db'),
-        os.path.expanduser('~/.navarum'),
-        # Стандартные пути Render.com
-        os.environ.get('RENDER_PROJECT_DIR', ''),
-        os.environ.get('RENDER_PROJECT_ROOT', ''),
-        '/opt/render/project/src',
-        '/opt/render/project/root',
-        # Fallback на текущую директорию
-        '.'
-    ]
+# Функция для получения подключения к базе данных
+def get_db_connection():
+    # Проверяем, есть ли DATABASE_URL (PostgreSQL на Render.com)
+    database_url = os.environ.get('DATABASE_URL')
     
-    for db_dir in possible_paths:
-        if db_dir:
-            try:
-                # Создаем директорию если её нет
-                if not os.path.exists(db_dir):
-                    os.makedirs(db_dir, exist_ok=True)
-                    print(f"Создана директория для БД: {db_dir}")
-                
-                # Проверяем права на запись
-                if os.access(db_dir, os.W_OK):
-                    db_path = os.path.join(db_dir, 'products.db')
-                    print(f"Используем директорию для БД: {db_dir}")
-                    print(f"Полный путь к БД: {db_path}")
-                    return db_path
-                else:
-                    print(f"Нет прав на запись в директорию: {db_dir}")
-            except Exception as e:
-                print(f"Ошибка проверки/создания директории {db_dir}: {e}")
+    if database_url:
+        print(f"Используем PostgreSQL базу данных")
+        try:
+            # Парсим URL для подключения к PostgreSQL
+            url = urlparse.urlparse(database_url)
+            conn = psycopg2.connect(
+                database=url.path[1:],
+                user=url.username,
+                password=url.password,
+                host=url.hostname,
+                port=url.port
+            )
+            print(f"PostgreSQL подключение установлено")
+            return conn
+        except Exception as e:
+            print(f"Ошибка подключения к PostgreSQL: {e}")
+            # Fallback на SQLite
+            pass
     
-    # Fallback на текущую директорию
-    print("Используем текущую директорию для БД")
-    return 'products.db'
+    # Fallback на SQLite для локальной разработки
+    print("Используем SQLite базу данных (локальная разработка)")
+    db_path = 'products.db'
+    conn = sqlite3.connect(db_path)
+    return conn
+
+# Функция для определения типа базы данных
+def get_db_type():
+    return 'postgresql' if os.environ.get('DATABASE_URL') else 'sqlite'
+
+# Универсальная функция для выполнения запросов
+def execute_query(query, params=None, fetch=False):
+    """Универсальная функция для выполнения SQL запросов"""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        if params:
+            cursor.execute(query, params)
+        else:
+            cursor.execute(query)
+        
+        if fetch:
+            result = cursor.fetchall()
+        else:
+            result = cursor.rowcount
+            
+        conn.commit()
+        return result
+    except Exception as e:
+        conn.rollback()
+        print(f"Ошибка выполнения запроса: {e}")
+        raise e
+    finally:
+        conn.close()
 
 # Создание базы данных и таблицы
 def init_db():
-    db_path = get_db_path()
-    print(f"Подключаемся к базе данных: {db_path}")
+    db_type = get_db_type()
+    print(f"Тип базы данных: {db_type}")
     
-    # Проверяем, существует ли файл БД
-    if os.path.exists(db_path):
-        print(f"Файл БД существует: {db_path}")
-        try:
-            conn = sqlite3.connect(db_path)
-            print(f"База данных успешно подключена: {db_path}")
-            
-            # Проверяем, есть ли таблицы в БД
-            cursor = conn.cursor()
-            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
-            if cursor.fetchone():
-                # Дополнительная проверка - есть ли данные в таблице
-                cursor.execute("SELECT COUNT(*) FROM products")
-                product_count = cursor.fetchone()[0]
-                print(f"Таблица products найдена в существующей БД с {product_count} товарами - БД уже инициализирована")
-                conn.close()
-                return  # БД уже инициализирована, выходим
-            else:
-                print(f"Таблица products не найдена в существующей БД")
-                conn.close()
-        except Exception as e:
-            print(f"Ошибка подключения к существующей БД: {e}")
-            # Если файл поврежден, удаляем его
-            try:
-                os.remove(db_path)
-                print(f"Удален поврежденный файл БД: {db_path}")
-            except Exception as del_e:
-                print(f"Ошибка удаления поврежденного файла: {del_e}")
-    else:
-        print(f"Файл БД не существует: {db_path}")
-    
-    # Создаем новую базу данных
-    print(f"Создаем новую базу данных: {db_path}")
     try:
-        conn = sqlite3.connect(db_path)
-        print(f"База данных успешно создана и подключена: {db_path}")
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Проверяем, есть ли таблицы в БД
+        if db_type == 'postgresql':
+            cursor.execute("SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'products')")
+            table_exists = cursor.fetchone()[0]
+        else:
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
+            table_exists = cursor.fetchone() is not None
+        
+        if table_exists:
+            # Дополнительная проверка - есть ли данные в таблице
+            cursor.execute("SELECT COUNT(*) FROM products")
+            product_count = cursor.fetchone()[0]
+            print(f"Таблица products найдена в существующей БД с {product_count} товарами - БД уже инициализирована")
+            conn.close()
+            return  # БД уже инициализирована, выходим
+        else:
+            print(f"Таблица products не найдена - создаем таблицы")
+            
     except Exception as e:
-        print(f"Ошибка создания БД: {e}")
-        # Fallback на текущую директорию
-        db_path = 'products.db'
-        conn = sqlite3.connect(db_path)
-        print(f"Используем fallback БД: {db_path}")
-    cursor = conn.cursor()
+        print(f"Ошибка подключения к БД: {e}")
+        return
     
-    # Таблица товаров
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS products (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            description TEXT NOT NULL,
-            price REAL NOT NULL,
-            image_url TEXT,
-            image_data BLOB,
-            category TEXT NOT NULL,
-            size TEXT,
-            material TEXT,
-            density TEXT
-        )
-    ''')
-    
-    # Таблица изображений товаров (для множественных фото)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS product_images (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            product_id INTEGER NOT NULL,
-            image_url TEXT,
-            image_data BLOB,
-            image_order INTEGER NOT NULL DEFAULT 0,
-            is_primary BOOLEAN NOT NULL DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
-        )
-    ''')
-    
-    # Таблица пользователей
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            role TEXT NOT NULL DEFAULT 'user',
-            first_name TEXT,
-            last_name TEXT,
-            phone TEXT,
-            address TEXT,
-            city TEXT,
-            postal_code TEXT,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-    
-    # Таблица корзины для авторизованных пользователей
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS cart_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            product_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL DEFAULT 1,
-            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE,
-            UNIQUE(user_id, product_id)
-        )
-    ''')
-    
-    # Таблица заказов
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS orders (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            total_amount REAL NOT NULL,
-            payment_method TEXT NOT NULL,
-            status TEXT NOT NULL DEFAULT 'pending',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-        )
-    ''')
-    
-    # Таблица элементов заказа
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS order_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id INTEGER NOT NULL,
-            product_id INTEGER NOT NULL,
-            quantity INTEGER NOT NULL,
-            price REAL NOT NULL,
-            FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
-        )
-    ''')
-
-    # Таблица контента страниц
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS page_content (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            section_name TEXT NOT NULL,
-            content_key TEXT NOT NULL,
-            content_value TEXT NOT NULL,
-            content_type TEXT NOT NULL DEFAULT 'text',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
+    # Создаем таблицы
+    print(f"Создаем таблицы в базе данных")
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+    except Exception as e:
+        print(f"Ошибка создания подключения: {e}")
+        return
+    # Создаем таблицы в зависимости от типа БД
+    if db_type == 'postgresql':
+        # PostgreSQL таблицы
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS products (
+                id SERIAL PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                price REAL NOT NULL,
+                image_url TEXT,
+                image_data BYTEA,
+                category TEXT NOT NULL,
+                size TEXT,
+                material TEXT,
+                density TEXT
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS product_images (
+                id SERIAL PRIMARY KEY,
+                product_id INTEGER NOT NULL,
+                image_url TEXT,
+                image_data BYTEA,
+                image_order INTEGER NOT NULL DEFAULT 0,
+                is_primary BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                first_name TEXT,
+                last_name TEXT,
+                phone TEXT,
+                address TEXT,
+                city TEXT,
+                postal_code TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cart_items (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE,
+                UNIQUE(user_id, product_id)
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                user_id INTEGER NOT NULL,
+                total_amount REAL NOT NULL,
+                payment_method TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS order_items (
+                id SERIAL PRIMARY KEY,
+                order_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                price REAL NOT NULL,
+                FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS page_content (
+                id SERIAL PRIMARY KEY,
+                section_name TEXT NOT NULL,
+                content_key TEXT NOT NULL,
+                content_value TEXT NOT NULL,
+                content_type TEXT NOT NULL DEFAULT 'text',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+    else:
+        # SQLite таблицы (для локальной разработки)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                price REAL NOT NULL,
+                image_url TEXT,
+                image_data BLOB,
+                category TEXT NOT NULL,
+                size TEXT,
+                material TEXT,
+                density TEXT
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS product_images (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                product_id INTEGER NOT NULL,
+                image_url TEXT,
+                image_data BLOB,
+                image_order INTEGER NOT NULL DEFAULT 0,
+                is_primary BOOLEAN NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT UNIQUE NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'user',
+                first_name TEXT,
+                last_name TEXT,
+                phone TEXT,
+                address TEXT,
+                city TEXT,
+                postal_code TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cart_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL DEFAULT 1,
+                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE,
+                UNIQUE(user_id, product_id)
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS orders (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                total_amount REAL NOT NULL,
+                payment_method TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                product_id INTEGER NOT NULL,
+                quantity INTEGER NOT NULL,
+                price REAL NOT NULL,
+                FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE,
+                FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+            )
+        ''')
+        
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS page_content (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                section_name TEXT NOT NULL,
+                content_key TEXT NOT NULL,
+                content_value TEXT NOT NULL,
+                content_type TEXT NOT NULL DEFAULT 'text',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
     
     # Добавляем тестовые данные для товаров, если таблица пустая
     cursor.execute('SELECT COUNT(*) FROM products')
@@ -770,7 +869,7 @@ def delete_product(current_user, product_id):
 @app.route('/api/products', methods=['GET'])
 def get_products():
     """Получить все товары с множественными изображениями"""
-    conn = sqlite3.connect(get_db_path())
+    conn = get_db_connection()
     cursor = conn.cursor()
     
     cursor.execute('SELECT * FROM products')
