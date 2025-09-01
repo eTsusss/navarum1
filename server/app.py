@@ -33,41 +33,60 @@ CORS(app, origins=[
 
 # Функция для получения пути к базе данных
 def get_db_path():
-    db_dir = os.environ.get('RENDER_PROJECT_DIR', '.')
-    # Создаем директорию если её нет
-    if not os.path.exists(db_dir):
-        try:
-            os.makedirs(db_dir, exist_ok=True)
-            print(f"Создана директория для БД: {db_dir}")
-        except Exception as e:
-            print(f"Ошибка создания директории {db_dir}: {e}")
-            # Fallback на текущую директорию
-            db_dir = '.'
+    # Пробуем несколько вариантов путей для Render.com
+    possible_paths = [
+        os.environ.get('RENDER_PROJECT_DIR', ''),
+        os.environ.get('RENDER_PROJECT_ROOT', ''),
+        '/opt/render/project/src',
+        '/opt/render/project/root',
+        '.'
+    ]
     
-    db_path = os.path.join(db_dir, 'products.db')
-    print(f"Путь к базе данных: {db_path}")
-    return db_path
+    for db_dir in possible_paths:
+        if db_dir and os.path.exists(db_dir):
+            try:
+                # Проверяем права на запись
+                if os.access(db_dir, os.W_OK):
+                    db_path = os.path.join(db_dir, 'products.db')
+                    print(f"Используем директорию для БД: {db_dir}")
+                    print(f"Полный путь к БД: {db_path}")
+                    return db_path
+                else:
+                    print(f"Нет прав на запись в директорию: {db_dir}")
+            except Exception as e:
+                print(f"Ошибка проверки директории {db_dir}: {e}")
+    
+    # Fallback на текущую директорию
+    print("Используем текущую директорию для БД")
+    return 'products.db'
 
 # Создание базы данных и таблицы
 def init_db():
-    try:
-        db_path = get_db_path()
-        print(f"Подключаемся к базе данных: {db_path}")
-        
-        # Проверяем права на запись в директорию
-        db_dir = os.path.dirname(db_path)
-        if not os.access(db_dir, os.W_OK):
-            print(f"Нет прав на запись в директорию: {db_dir}")
-            print("Используем текущую директорию")
+    db_path = get_db_path()
+    print(f"Подключаемся к базе данных: {db_path}")
+    
+    # Проверяем, существует ли уже база данных
+    if os.path.exists(db_path):
+        print(f"База данных уже существует: {db_path}")
+        try:
+            conn = sqlite3.connect(db_path)
+            print(f"База данных успешно подключена: {db_path}")
+        except Exception as e:
+            print(f"Ошибка подключения к существующей БД: {e}")
+            # Если не можем подключиться к существующей, создаем новую
+            conn = sqlite3.connect(db_path)
+            print(f"Создана новая база данных: {db_path}")
+    else:
+        print(f"Создаем новую базу данных: {db_path}")
+        try:
+            conn = sqlite3.connect(db_path)
+            print(f"База данных успешно создана и подключена: {db_path}")
+        except Exception as e:
+            print(f"Ошибка создания БД: {e}")
+            # Fallback на текущую директорию
             db_path = 'products.db'
-        
-        conn = sqlite3.connect(db_path)
-        print(f"База данных успешно подключена: {db_path}")
-    except Exception as e:
-        print(f"Ошибка подключения к БД: {e}")
-        print("Используем текущую директорию")
-        db_path = 'products.db'
-        conn = sqlite3.connect(db_path)
+            conn = sqlite3.connect(db_path)
+            print(f"Используем fallback БД: {db_path}")
     cursor = conn.cursor()
     
     # Таблица товаров
