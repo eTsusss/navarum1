@@ -8,7 +8,7 @@ import sqlite3
 import os
 
 def update_categories():
-    """Обновляет категории в базе данных"""
+    """Обновляет категории в базе данных для новых 6 категорий"""
     
     # Подключаемся к базе данных
     db_path = 'products.db'
@@ -22,37 +22,52 @@ def update_categories():
     try:
         print("Обновляем категории товаров...")
         
-        # Обновляем товары с категорией 'Пальто' на 'Футболки'
-        cursor.execute("UPDATE products SET category = 'Футболки' WHERE category = 'Пальто'")
-        coats_updated = cursor.rowcount
-        print(f"Обновлено товаров с категорией 'Пальто': {coats_updated}")
-        
-        # Удаляем товары с категорией 'Куртки'
-        cursor.execute("DELETE FROM products WHERE category = 'Куртки'")
-        jackets_deleted = cursor.rowcount
-        print(f"Удалено товаров с категорией 'Куртки': {jackets_deleted}")
+        # Обновляем товары с категорией 'Куртки' на 'Пижама' (или другую подходящую)
+        cursor.execute("UPDATE products SET category = 'Пижама' WHERE category = 'Куртки'")
+        jackets_updated = cursor.rowcount
+        print(f"Обновлено товаров с категорией 'Куртки': {jackets_updated}")
         
         print("Обновляем контент страницы...")
         
-        # Обновляем фильтр 'coats' с 'Пальто' на 'Футболки'
-        cursor.execute("UPDATE page_content SET content_value = 'Футболки' WHERE section_name = 'filters' AND content_key = 'coats'")
-        filters_updated = cursor.rowcount
-        print(f"Обновлено фильтров: {filters_updated}")
+        # Обновляем фильтры
+        cursor.execute("UPDATE page_content SET content_value = 'Пальто' WHERE section_name = 'filters' AND content_key = 'coats'")
+        coats_updated = cursor.rowcount
+        print(f"Обновлено фильтр 'coats' на 'Пальто': {coats_updated}")
         
-        # Удаляем фильтр 'jackets'
-        cursor.execute("DELETE FROM page_content WHERE section_name = 'filters' AND content_key = 'jackets'")
-        jackets_filter_deleted = cursor.rowcount
-        print(f"Удалено фильтров 'jackets': {jackets_filter_deleted}")
+        # Добавляем новые фильтры
+        new_filters = [
+            ('filters', 'tshirts', 'Футболки', 'text'),
+            ('filters', 'pajamas', 'Пижама', 'text'),
+            ('filters', 'bedding', 'Постельное белье', 'text')
+        ]
         
-        # Обновляем категорию 'coats' с 'Пальто' на 'Футболки'
-        cursor.execute("UPDATE page_content SET content_value = 'Футболки' WHERE section_name = 'categories' AND content_key = 'coats'")
+        for section, key, value, content_type in new_filters:
+            cursor.execute("""
+                INSERT OR REPLACE INTO page_content (section_name, content_key, content_value, content_type)
+                VALUES (?, ?, ?, ?)
+            """, (section, key, value, content_type))
+        
+        print("Добавлены новые фильтры: Футболки, Пижама, Постельное белье")
+        
+        # Обновляем категории
+        cursor.execute("UPDATE page_content SET content_value = 'Пальто' WHERE section_name = 'categories' AND content_key = 'coats'")
         categories_updated = cursor.rowcount
-        print(f"Обновлено категорий: {categories_updated}")
+        print(f"Обновлено категорию 'coats' на 'Пальто': {categories_updated}")
         
-        # Удаляем категорию 'jackets'
-        cursor.execute("DELETE FROM page_content WHERE section_name = 'categories' AND content_key = 'jackets'")
-        jackets_category_deleted = cursor.rowcount
-        print(f"Удалено категорий 'jackets': {jackets_category_deleted}")
+        # Добавляем новые категории
+        new_categories = [
+            ('categories', 'tshirts', 'Футболки', 'text'),
+            ('categories', 'pajamas', 'Пижама', 'text'),
+            ('categories', 'bedding', 'Постельное белье', 'text')
+        ]
+        
+        for section, key, value, content_type in new_categories:
+            cursor.execute("""
+                INSERT OR REPLACE INTO page_content (section_name, content_key, content_value, content_type)
+                VALUES (?, ?, ?, ?)
+            """, (section, key, value, content_type))
+        
+        print("Добавлены новые категории: Футболки, Пижама, Постельное белье")
         
         # Сохраняем изменения
         conn.commit()

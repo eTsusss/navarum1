@@ -211,9 +211,12 @@ def init_db():
             
             # Фильтры
             ('filters', 'all_products', 'Все товары', 'text'),
-            ('filters', 'towels', 'Полотенца', 'text'),
-            ('filters', 'coats', 'Футболки', 'text'),
+            ('filters', 'coats', 'Пальто', 'text'),
+            ('filters', 'tshirts', 'Футболки', 'text'),
+            ('filters', 'pajamas', 'Пижама', 'text'),
             ('filters', 'sweaters', 'Свитера', 'text'),
+            ('filters', 'towels', 'Полотенца', 'text'),
+            ('filters', 'bedding', 'Постельное белье', 'text'),
             
             # Футер
             ('footer', 'about_title', 'О NAVARUM', 'text'),
@@ -265,9 +268,12 @@ def init_db():
             ('messages', 'browse_products', 'Перейти к товарам', 'text'),
             
             # Категории товаров
-            ('categories', 'towels', 'Полотенца', 'text'),
-            ('categories', 'coats', 'Футболки', 'text'),
+            ('categories', 'coats', 'Пальто', 'text'),
+            ('categories', 'tshirts', 'Футболки', 'text'),
+            ('categories', 'pajamas', 'Пижама', 'text'),
             ('categories', 'sweaters', 'Свитера', 'text'),
+            ('categories', 'towels', 'Полотенца', 'text'),
+            ('categories', 'bedding', 'Постельное белье', 'text'),
             ('categories', 'robes', 'Халаты', 'text')
         ]
         

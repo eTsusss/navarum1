@@ -338,9 +338,12 @@ class ContentManager {
             },
             'filters': {
                 'all_products': '.filter-btn[data-category="all"]',
+                'coats': '.filter-btn[data-category="Пальто"]',
+                'tshirts': '.filter-btn[data-category="Футболки"]',
+                'pajamas': '.filter-btn[data-category="Пижама"]',
+                'sweaters': '.filter-btn[data-category="Свитера"]',
                 'towels': '.filter-btn[data-category="Полотенца"]',
-                'coats': '.filter-btn[data-category="Футболки"]',
-                'sweaters': '.filter-btn[data-category="Свитера"]'
+                'bedding': '.filter-btn[data-category="Постельное белье"]'
             }
         };
 
