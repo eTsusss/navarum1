@@ -35,13 +35,17 @@ CORS(app, origins=[
 def get_db_path():
     # Пробуем несколько вариантов путей для Render.com
     possible_paths = [
-        # Системные директории, которые НЕ очищаются при перезапуске
+        # Создаем собственную постоянную директорию в домашней папке пользователя
+        os.path.expanduser('~/navarum_db'),
+        os.path.expanduser('~/.navarum'),
+        # Системные переменные окружения
+        os.environ.get('TMPDIR', ''),
+        os.environ.get('TEMP', ''),
+        os.environ.get('TMP', ''),
+        # Системные директории
         '/tmp',
         '/var/tmp',
-        # Альтернативные системные пути
-        '/usr/local/tmp',
-        '/opt/tmp',
-        # Стандартные пути Render.com (могут очищаться)
+        # Стандартные пути Render.com
         os.environ.get('RENDER_PROJECT_DIR', ''),
         os.environ.get('RENDER_PROJECT_ROOT', ''),
         '/opt/render/project/src',
