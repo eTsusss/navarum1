@@ -356,23 +356,31 @@ function displayProducts(products) {
     }
     
     productsContainer.innerHTML = products.map(product => {
-        // Определяем источник изображения
+        // Определяем источник изображения (используем первое изображение для карточки)
         let imageSrc = '';
-        if (product.image_data) {
-            // Если есть данные изображения в base64, используем их
-            imageSrc = `data:image/jpeg;base64,${product.image_data}`;
-        } else if (product.image_url) {
-            // Если есть URL изображения, используем его
-            imageSrc = product.image_url;
-        } else {
-            // Если нет изображения, используем заглушку
+        if (product.images && product.images.length > 0) {
+            const firstImage = product.images[0];
+            if (firstImage.data) {
+                imageSrc = `data:image/jpeg;base64,${firstImage.data}`;
+            } else if (firstImage.url) {
+                imageSrc = firstImage.url;
+            }
+        }
+        
+        // Если нет изображений, используем заглушку
+        if (!imageSrc) {
             imageSrc = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
         }
+        
+        // Показываем индикатор множественных изображений
+        const imageCount = product.images ? product.images.length : 0;
+        const imageIndicator = imageCount > 1 ? `<div class="image-count">+${imageCount - 1}</div>` : '';
         
         return `
             <div class="product-card" data-product-id="${product.id}">
                 <div class="product-image">
                     <img src="${imageSrc}" alt="${product.name}" loading="lazy" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+RXJyb3I8L3RleHQ+PC9zdmc+';">
+                    ${imageIndicator}
                     <div class="overlay">
                         <button class="view-button">Подробнее</button>
                     </div>
@@ -470,16 +478,85 @@ function showProductModal(product) {
     // Сохраняем текущий товар для корзины
     currentProduct = product;
     
-    // Определяем источник изображения
-    if (product.image_data) {
-        // Если есть данные изображения в base64, используем их
-        modalImage.src = `data:image/jpeg;base64,${product.image_data}`;
-    } else if (product.image_url) {
-        // Если есть URL изображения, используем его
-        modalImage.src = product.image_url;
-    } else {
-        // Если нет изображения, используем заглушку
-        modalImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+    // Получаем изображения товара
+    const images = product.images || [];
+    let currentImageIndex = 0;
+    
+    // Функция для обновления изображения
+    function updateModalImage() {
+        if (images.length > 0) {
+            const currentImage = images[currentImageIndex];
+            if (currentImage.data) {
+                modalImage.src = `data:image/jpeg;base64,${currentImage.data}`;
+            } else if (currentImage.url) {
+                modalImage.src = currentImage.url;
+            }
+        } else {
+            // Если нет изображений, используем заглушку
+            modalImage.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCwgc2Fucy1lcmlmIiBmb250LXNpemU9IjE2IiBmaWxsPSIjOTk5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkeT0iLjNlbSI+Tm8gSW1hZ2U8L3RleHQ+PC9zdmc+';
+        }
+    }
+    
+    // Обновляем изображение
+    updateModalImage();
+    
+    // Добавляем навигацию по изображениям, если их больше одного
+    if (images.length > 1) {
+        // Создаем навигацию
+        let navigationHTML = `
+            <div class="image-navigation">
+                <button class="nav-btn prev-btn" onclick="changeImage(-1)">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <div class="image-counter">${currentImageIndex + 1} / ${images.length}</div>
+                <button class="nav-btn next-btn" onclick="changeImage(1)">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            <div class="image-thumbnails">
+        `;
+        
+        images.forEach((img, index) => {
+            const thumbSrc = img.data ? `data:image/jpeg;base64,${img.data}` : img.url;
+            navigationHTML += `
+                <div class="thumbnail ${index === 0 ? 'active' : ''}" onclick="goToImage(${index})">
+                    <img src="${thumbSrc}" alt="Фото ${index + 1}">
+                </div>
+            `;
+        });
+        
+        navigationHTML += '</div>';
+        
+        // Вставляем навигацию после изображения
+        const imageContainer = modal.querySelector('.modal-image-container');
+        const existingNav = imageContainer.querySelector('.image-navigation');
+        if (existingNav) {
+            existingNav.remove();
+        }
+        imageContainer.insertAdjacentHTML('beforeend', navigationHTML);
+        
+        // Добавляем глобальные функции для навигации
+        window.changeImage = function(direction) {
+            currentImageIndex = (currentImageIndex + direction + images.length) % images.length;
+            updateModalImage();
+            updateNavigation();
+        };
+        
+        window.goToImage = function(index) {
+            currentImageIndex = index;
+            updateModalImage();
+            updateNavigation();
+        };
+        
+        function updateNavigation() {
+            const counter = modal.querySelector('.image-counter');
+            const thumbnails = modal.querySelectorAll('.thumbnail');
+            
+            if (counter) counter.textContent = `${currentImageIndex + 1} / ${images.length}`;
+            thumbnails.forEach((thumb, index) => {
+                thumb.classList.toggle('active', index === currentImageIndex);
+            });
+        }
     }
     
     modalImage.alt = product.name;
@@ -545,10 +622,15 @@ function showAddProductForm() {
                     <input type="number" id="product-price" name="price" step="0.01" required>
                 </div>
                 <div class="form-group">
-                    <label for="product-image">Изображение товара:</label>
-                    <input type="file" id="product-image" name="image" accept="image/*">
-                    <small>Или укажите URL изображения:</small>
-                    <input type="url" id="product-image-url" name="image_url" placeholder="https://example.com/image.jpg">
+                    <label for="product-images">Изображения товара (до 5 фото):</label>
+                    <input type="file" id="product-images" name="images" accept="image/*" multiple>
+                    <small>Можно выбрать несколько файлов. Первое фото будет основным.</small>
+                    <div id="image-preview" class="image-preview"></div>
+                    
+                    <div class="form-group">
+                        <label for="product-image-urls">Или укажите URL изображений (через запятую):</label>
+                        <textarea id="product-image-urls" name="image_urls" placeholder="https://example.com/image1.jpg, https://example.com/image2.jpg" rows="2"></textarea>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="product-category">Категория:</label>

@@ -52,6 +52,20 @@ def init_db():
         )
     ''')
     
+    # Таблица изображений товаров (для множественных фото)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS product_images (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            product_id INTEGER NOT NULL,
+            image_url TEXT,
+            image_data BLOB,
+            image_order INTEGER NOT NULL DEFAULT 0,
+            is_primary BOOLEAN NOT NULL DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+        )
+    ''')
+    
     # Таблица пользователей
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS users (
@@ -455,33 +469,7 @@ def get_profile(current_user):
 @token_required
 @admin_required
 def add_product(current_user):
-    """Добавить новый товар (только для администратора)"""
-    # Проверяем, есть ли файл изображения
-    image_data = None
-    image_url = None
-    
-    if 'image' in request.files:
-        file = request.files['image']
-        if file and file.filename and allowed_file(file.filename):
-            try:
-                # Сохраняем файл временно
-                filename = secure_filename(file.filename)
-                filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-                file.save(filepath)
-                
-                # Читаем файл как BLOB для сохранения в БД
-                with open(filepath, 'rb') as f:
-                    image_data = f.read()
-                
-                print(f"Image uploaded successfully: {filename}, size: {len(image_data)} bytes")
-                
-                # Удаляем временный файл
-                os.remove(filepath)
-            except Exception as e:
-                print(f"Error processing image: {e}")
-                return jsonify({'error': f'Ошибка обработки изображения: {str(e)}'}), 500
-        elif file and file.filename:
-            return jsonify({'error': 'Неподдерживаемый формат файла. Разрешены: png, jpg, jpeg, gif, webp'}), 400
+    """Добавить новый товар с множественными изображениями (только для администратора)"""
     
     # Получаем данные из формы или JSON
     if request.is_json:
@@ -492,33 +480,87 @@ def add_product(current_user):
     if not data or not data.get('name') or not data.get('description') or not data.get('price'):
         return jsonify({'error': 'Необходимо указать name, description и price'}), 400
     
-    # Если нет загруженного файла, используем URL
-    if not image_data:
-        image_url = data.get('image_url', '')
-        print(f"No image file uploaded, using URL: {image_url}")
+    # Проверяем изображения
+    images = []
+    
+    # Обрабатываем загруженные файлы
+    if 'images' in request.files:
+        files = request.files.getlist('images')
+        for i, file in enumerate(files):
+            if file and file.filename and allowed_file(file.filename):
+                try:
+                    # Сохраняем файл временно
+                    filename = secure_filename(file.filename)
+                    filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+                    file.save(filepath)
+                    
+                    # Читаем файл как BLOB для сохранения в БД
+                    with open(filepath, 'rb') as f:
+                        image_data = f.read()
+                    
+                    images.append({
+                        'data': image_data,
+                        'url': None,
+                        'order': i,
+                        'is_primary': i == 0  # Первое изображение - основное
+                    })
+                    
+                    print(f"Image {i+1} uploaded successfully: {filename}, size: {len(image_data)} bytes")
+                    
+                    # Удаляем временный файл
+                    os.remove(filepath)
+                except Exception as e:
+                    print(f"Error processing image {i+1}: {e}")
+                    return jsonify({'error': f'Ошибка обработки изображения {i+1}: {str(e)}'}), 500
+    
+    # Обрабатываем URL изображений
+    if 'image_urls' in data:
+        urls = data.get('image_urls', '').split(',')
+        for i, url in enumerate(urls):
+            url = url.strip()
+            if url:
+                images.append({
+                    'data': None,
+                    'url': url,
+                    'order': len(images) + i,
+                    'is_primary': len(images) == 0 and i == 0  # Основное, если нет файлов
+                })
+    
+    # Если нет ни файлов, ни URL, показываем ошибку
+    if not images:
+        return jsonify({'error': 'Необходимо указать хотя бы одно изображение товара (файлы или URL)'}), 400
     
     conn = sqlite3.connect('products.db')
     cursor = conn.cursor()
     
     try:
+        # Добавляем товар
         cursor.execute('''
-            INSERT INTO products (name, description, price, image_url, image_data, category, size, material, density)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO products (name, description, price, category, size, material, density)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
             data['name'], data['description'], data['price'],
-            image_url, image_data, data.get('category', ''),
-            data.get('size', ''), data.get('material', ''), data.get('density', '')
+            data.get('category', ''), data.get('size', ''),
+            data.get('material', ''), data.get('density', '')
         ))
         
         product_id = cursor.lastrowid
+        
+        # Добавляем изображения
+        for img in images:
+            cursor.execute('''
+                INSERT INTO product_images (product_id, image_url, image_data, image_order, is_primary)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (product_id, img['url'], img['data'], img['order'], img['is_primary']))
+        
         conn.commit()
         
-        print(f"Product added successfully: ID={product_id}, name={data['name']}, has_image_data={image_data is not None}")
+        print(f"Product added successfully: ID={product_id}, name={data['name']}, images={len(images)}")
         
         return jsonify({
             'message': 'Товар успешно добавлен',
             'product_id': product_id,
-            'has_image': image_data is not None or bool(image_url)
+            'images_count': len(images)
         }), 201
         
     except Exception as e:
@@ -637,16 +679,12 @@ def delete_product(current_user, product_id):
 
 @app.route('/api/products', methods=['GET'])
 def get_products():
-    """Получить все товары"""
+    """Получить все товары с множественными изображениями"""
     conn = sqlite3.connect('products.db')
     cursor = conn.cursor()
     
     cursor.execute('SELECT * FROM products')
     products = cursor.fetchall()
-    
-    conn.close()
-    
-    print(f"Retrieved {len(products)} products from database")
     
     products_list = []
     for product in products:
@@ -655,26 +693,66 @@ def get_products():
             'name': product[1],
             'description': product[2],
             'price': product[3],
-            'image_url': product[4],
-            'image_data': None,
             'category': product[6],
             'size': product[7],
             'material': product[8],
-            'density': product[9]
+            'density': product[9],
+            'images': []
         }
         
-        # Если есть данные изображения, конвертируем в base64
-        if product[5]:  # image_data
-            try:
-                image_base64 = base64.b64encode(product[5]).decode('utf-8')
-                product_data['image_data'] = image_base64
-                print(f"Product {product[0]} has image_data: {len(image_base64)} chars")
-            except Exception as e:
-                print(f"Error encoding image_data for product {product[0]}: {e}")
-        else:
-            print(f"Product {product[0]} has no image_data, image_url: {product[4]}")
+        # Получаем изображения для товара
+        cursor.execute('''
+            SELECT image_url, image_data, image_order, is_primary 
+            FROM product_images 
+            WHERE product_id = ? 
+            ORDER BY image_order
+        ''', (product[0],))
+        
+        images = cursor.fetchall()
+        for img in images:
+            image_data = {
+                'url': img[0],
+                'data': None,
+                'order': img[2],
+                'is_primary': bool(img[3])
+            }
+            
+            # Если есть данные изображения, конвертируем в base64
+            if img[1]:  # image_data
+                try:
+                    image_base64 = base64.b64encode(img[1]).decode('utf-8')
+                    image_data['data'] = image_base64
+                except Exception as e:
+                    print(f"Error encoding image_data for product {product[0]}: {e}")
+            
+            product_data['images'].append(image_data)
+        
+        # Если нет изображений в новой таблице, используем старые поля для совместимости
+        if not product_data['images']:
+            if product[5]:  # image_data
+                try:
+                    image_base64 = base64.b64encode(product[5]).decode('utf-8')
+                    product_data['images'].append({
+                        'url': None,
+                        'data': image_base64,
+                        'order': 0,
+                        'is_primary': True
+                    })
+                except Exception as e:
+                    print(f"Error encoding old image_data for product {product[0]}: {e}")
+            elif product[4]:  # image_url
+                product_data['images'].append({
+                    'url': product[4],
+                    'data': None,
+                    'order': 0,
+                    'is_primary': True
+                })
         
         products_list.append(product_data)
+    
+    conn.close()
+    
+    print(f"Retrieved {len(products)} products from database")
     
     return jsonify(products_list)
 
