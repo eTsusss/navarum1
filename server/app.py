@@ -35,16 +35,28 @@ CORS(app, origins=[
 def get_db_path():
     # Пробуем несколько вариантов путей для Render.com
     possible_paths = [
+        # Сначала пробуем создать глубоко вложенную директорию для постоянного хранения
+        '/opt/render/project/src/data',
+        '/opt/render/project/src/database',
+        '/opt/render/project/data',
+        '/opt/render/project/database',
+        # Затем стандартные пути
         os.environ.get('RENDER_PROJECT_DIR', ''),
         os.environ.get('RENDER_PROJECT_ROOT', ''),
         '/opt/render/project/src',
         '/opt/render/project/root',
+        # Fallback
         '.'
     ]
     
     for db_dir in possible_paths:
-        if db_dir and os.path.exists(db_dir):
+        if db_dir:
             try:
+                # Создаем директорию если её нет
+                if not os.path.exists(db_dir):
+                    os.makedirs(db_dir, exist_ok=True)
+                    print(f"Создана директория для БД: {db_dir}")
+                
                 # Проверяем права на запись
                 if os.access(db_dir, os.W_OK):
                     db_path = os.path.join(db_dir, 'products.db')
@@ -54,7 +66,7 @@ def get_db_path():
                 else:
                     print(f"Нет прав на запись в директорию: {db_dir}")
             except Exception as e:
-                print(f"Ошибка проверки директории {db_dir}: {e}")
+                print(f"Ошибка проверки/создания директории {db_dir}: {e}")
     
     # Fallback на текущую директорию
     print("Используем текущую директорию для БД")
