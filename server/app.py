@@ -35,17 +35,18 @@ CORS(app, origins=[
 def get_db_path():
     # Пробуем несколько вариантов путей для Render.com
     possible_paths = [
-        # Сначала пробуем создать глубоко вложенную директорию для постоянного хранения
-        '/opt/render/project/src/data',
-        '/opt/render/project/src/database',
-        '/opt/render/project/data',
-        '/opt/render/project/database',
-        # Затем стандартные пути
+        # Системные директории, которые НЕ очищаются при перезапуске
+        '/tmp',
+        '/var/tmp',
+        # Альтернативные системные пути
+        '/usr/local/tmp',
+        '/opt/tmp',
+        # Стандартные пути Render.com (могут очищаться)
         os.environ.get('RENDER_PROJECT_DIR', ''),
         os.environ.get('RENDER_PROJECT_ROOT', ''),
         '/opt/render/project/src',
         '/opt/render/project/root',
-        # Fallback
+        # Fallback на текущую директорию
         '.'
     ]
     
