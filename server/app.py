@@ -110,6 +110,10 @@ def execute_query(query, params=None, fetch=False):
     cursor = conn.cursor()
     
     try:
+        # Конвертируем SQLite синтаксис в PostgreSQL если нужно
+        if get_db_type() == 'postgresql' and params:
+            query = query.replace('?', '%s')
+        
         if params:
             cursor.execute(query, params)
         else:
@@ -780,24 +784,42 @@ def add_product(current_user):
     cursor = conn.cursor()
     
     try:
+        db_type = get_db_type()
+        
         # Добавляем товар
-        cursor.execute('''
-            INSERT INTO products (name, description, price, category, size, material, density)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            data['name'], data['description'], data['price'],
-            data.get('category', ''), data.get('size', ''),
-            data.get('material', ''), data.get('density', '')
-        ))
+        if db_type == 'postgresql':
+            cursor.execute('''
+                INSERT INTO products (name, description, price, category, size, material, density)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            ''', (
+                data['name'], data['description'], data['price'],
+                data.get('category', ''), data.get('size', ''),
+                data.get('material', ''), data.get('density', '')
+            ))
+        else:
+            cursor.execute('''
+                INSERT INTO products (name, description, price, category, size, material, density)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data['name'], data['description'], data['price'],
+                data.get('category', ''), data.get('size', ''),
+                data.get('material', ''), data.get('density', '')
+            ))
         
         product_id = cursor.lastrowid
         
         # Добавляем изображения
         for img in images:
-            cursor.execute('''
-                INSERT INTO product_images (product_id, image_url, image_data, image_order, is_primary)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (product_id, img['url'], img['data'], img['order'], img['is_primary']))
+            if db_type == 'postgresql':
+                cursor.execute('''
+                    INSERT INTO product_images (product_id, image_url, image_data, image_order, is_primary)
+                    VALUES (%s, %s, %s, %s, %s)
+                ''', (product_id, img['url'], img['data'], img['order'], img['is_primary']))
+            else:
+                cursor.execute('''
+                    INSERT INTO product_images (product_id, image_url, image_data, image_order, is_primary)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (product_id, img['url'], img['data'], img['order'], img['is_primary']))
         
         conn.commit()
         
