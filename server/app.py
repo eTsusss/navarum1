@@ -43,17 +43,19 @@ def get_db_connection():
         try:
             # Парсим URL для подключения к PostgreSQL
             url = urlparse.urlparse(database_url)
+            print(f"Подключаемся к PostgreSQL: host={url.hostname}, port={url.port}, database={url.path[1:]}")
             conn = pg8000.connect(
                 database=url.path[1:],
                 user=url.username,
                 password=url.password,
                 host=url.hostname,
-                port=url.port
+                port=int(url.port) if url.port else 5432
             )
             print(f"PostgreSQL подключение установлено")
             return conn
         except Exception as e:
             print(f"Ошибка подключения к PostgreSQL: {e}")
+            print(f"URL: {database_url}")
             # Fallback на SQLite
             pass
     
@@ -61,6 +63,40 @@ def get_db_connection():
     print("Используем SQLite базу данных (локальная разработка)")
     db_path = 'products.db'
     conn = sqlite3.connect(db_path)
+    
+    # Создаем таблицы если их нет
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='products'")
+    if not cursor.fetchone():
+        print("Создаем таблицы в SQLite fallback")
+        # Создаем базовые таблицы
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS products (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                price REAL NOT NULL,
+                image_url TEXT,
+                image_data BLOB,
+                category TEXT NOT NULL,
+                size TEXT,
+                material TEXT,
+                density TEXT
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS page_content (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                section_name TEXT NOT NULL,
+                content_key TEXT NOT NULL,
+                content_value TEXT NOT NULL,
+                content_type TEXT NOT NULL DEFAULT 'text',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        conn.commit()
+    
     return conn
 
 # Функция для определения типа базы данных
