@@ -1008,12 +1008,21 @@ def get_products():
         }
         
         # Получаем изображения для товара
-        cursor.execute('''
-            SELECT image_url, image_data, image_order, is_primary 
-            FROM product_images 
-            WHERE product_id = ? 
-            ORDER BY image_order
-        ''', (product[0],))
+        db_type = get_db_type()
+        if db_type == 'postgresql':
+            cursor.execute('''
+                SELECT image_url, image_data, image_order, is_primary 
+                FROM product_images 
+                WHERE product_id = %s 
+                ORDER BY image_order
+            ''', (product[0],))
+        else:
+            cursor.execute('''
+                SELECT image_url, image_data, image_order, is_primary 
+                FROM product_images 
+                WHERE product_id = ? 
+                ORDER BY image_order
+            ''', (product[0],))
         
         images = cursor.fetchall()
         for img in images:
@@ -1069,7 +1078,11 @@ def get_product(product_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
+    else:
+        cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
     product = cursor.fetchone()
     
     conn.close()
@@ -1106,7 +1119,11 @@ def get_products_by_category(category):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT * FROM products WHERE category = ?', (category,))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('SELECT * FROM products WHERE category = %s', (category,))
+    else:
+        cursor.execute('SELECT * FROM products WHERE category = ?', (category,))
     products = cursor.fetchall()
     
     conn.close()
