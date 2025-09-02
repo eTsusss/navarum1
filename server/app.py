@@ -795,11 +795,13 @@ def add_product(current_user):
             cursor.execute('''
                 INSERT INTO products (name, description, price, category, size, material, density)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
             ''', (
                 data['name'], data['description'], data['price'],
                 data.get('category', ''), data.get('size', ''),
                 data.get('material', ''), data.get('density', '')
             ))
+            product_id = cursor.fetchone()[0]
         else:
             cursor.execute('''
                 INSERT INTO products (name, description, price, category, size, material, density)
@@ -809,8 +811,7 @@ def add_product(current_user):
                 data.get('category', ''), data.get('size', ''),
                 data.get('material', ''), data.get('density', '')
             ))
-        
-        product_id = cursor.lastrowid
+            product_id = cursor.lastrowid
         
         # Добавляем изображения
         for img in images:
