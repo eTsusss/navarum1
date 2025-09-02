@@ -1,8 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import sqlite3
-import psycopg2
-import psycopg2.extras
+import pg8000
 import os
 import jwt
 import bcrypt
@@ -44,7 +43,7 @@ def get_db_connection():
         try:
             # Парсим URL для подключения к PostgreSQL
             url = urlparse.urlparse(database_url)
-            conn = psycopg2.connect(
+            conn = pg8000.connect(
                 database=url.path[1:],
                 user=url.username,
                 password=url.password,
