@@ -683,7 +683,11 @@ def login():
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT id, username, email, password_hash, role FROM users WHERE username = ?', (username,))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('SELECT id, username, email, password_hash, role FROM users WHERE username = %s', (username,))
+    else:
+        cursor.execute('SELECT id, username, email, password_hash, role FROM users WHERE username = ?', (username,))
     user = cursor.fetchone()
     
     conn.close()
@@ -879,8 +883,13 @@ def update_product(current_user, product_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    db_type = get_db_type()
+    
     # Проверяем, существует ли товар
-    cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
+    if db_type == 'postgresql':
+        cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
+    else:
+        cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
     if not cursor.fetchone():
         conn.close()
         return jsonify({'error': 'Товар не найден'}), 404
@@ -893,26 +902,48 @@ def update_product(current_user, product_id):
     try:
         # Обновляем товар
         if image_data:
-            cursor.execute('''
-                UPDATE products 
-                SET name = ?, description = ?, price = ?, image_url = ?, image_data = ?, category = ?, size = ?, material = ?, density = ?
-                WHERE id = ?
-            ''', (
-                data.get('name'), data.get('description'), data.get('price'),
-                image_url, image_data, data.get('category'), data.get('size'),
-                data.get('material'), data.get('density'), product_id
-            ))
+            if db_type == 'postgresql':
+                cursor.execute('''
+                    UPDATE products 
+                    SET name = %s, description = %s, price = %s, image_url = %s, image_data = %s, category = %s, size = %s, material = %s, density = %s
+                    WHERE id = %s
+                ''', (
+                    data.get('name'), data.get('description'), data.get('price'),
+                    image_url, image_data, data.get('category'), data.get('size'),
+                    data.get('material'), data.get('density'), product_id
+                ))
+            else:
+                cursor.execute('''
+                    UPDATE products 
+                    SET name = ?, description = ?, price = ?, image_url = ?, image_data = ?, category = ?, size = ?, material = ?, density = ?
+                    WHERE id = ?
+                ''', (
+                    data.get('name'), data.get('description'), data.get('price'),
+                    image_url, image_data, data.get('category'), data.get('size'),
+                    data.get('material'), data.get('density'), product_id
+                ))
             print(f"Product updated with new image: ID={product_id}")
         else:
-            cursor.execute('''
-                UPDATE products 
-                SET name = ?, description = ?, price = ?, image_url = ?, category = ?, size = ?, material = ?, density = ?
-                WHERE id = ?
-            ''', (
-                data.get('name'), data.get('description'), data.get('price'),
-                image_url, data.get('category'), data.get('size'),
-                data.get('material'), data.get('density'), product_id
-            ))
+            if db_type == 'postgresql':
+                cursor.execute('''
+                    UPDATE products 
+                    SET name = %s, description = %s, price = %s, image_url = %s, category = %s, size = %s, material = %s, density = %s
+                    WHERE id = %s
+                ''', (
+                    data.get('name'), data.get('description'), data.get('price'),
+                    image_url, data.get('category'), data.get('size'),
+                    data.get('material'), data.get('density'), product_id
+                ))
+            else:
+                cursor.execute('''
+                    UPDATE products 
+                    SET name = ?, description = ?, price = ?, image_url = ?, category = ?, size = ?, material = ?, density = ?
+                    WHERE id = ?
+                ''', (
+                    data.get('name'), data.get('description'), data.get('price'),
+                    image_url, data.get('category'), data.get('size'),
+                    data.get('material'), data.get('density'), product_id
+                ))
             print(f"Product updated without image change: ID={product_id}")
         
         conn.commit()
@@ -933,13 +964,21 @@ def delete_product(current_user, product_id):
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    db_type = get_db_type()
+    
     # Проверяем, существует ли товар
-    cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
+    if db_type == 'postgresql':
+        cursor.execute('SELECT * FROM products WHERE id = %s', (product_id,))
+    else:
+        cursor.execute('SELECT * FROM products WHERE id = ?', (product_id,))
     if not cursor.fetchone():
         conn.close()
         return jsonify({'error': 'Товар не найден'}), 404
     
-    cursor.execute('DELETE FROM products WHERE id = ?', (product_id,))
+    if db_type == 'postgresql':
+        cursor.execute('DELETE FROM products WHERE id = %s', (product_id,))
+    else:
+        cursor.execute('DELETE FROM products WHERE id = ?', (product_id,))
     conn.commit()
     conn.close()
     
@@ -1392,10 +1431,17 @@ def get_user_profile(current_user):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('''
-        SELECT id, username, email, role, first_name, last_name, phone, address, city, postal_code, created_at, updated_at
-        FROM users WHERE id = ?
-    ''', (current_user['id'],))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('''
+            SELECT id, username, email, role, first_name, last_name, phone, address, city, postal_code, created_at, updated_at
+            FROM users WHERE id = %s
+        ''', (current_user['id'],))
+    else:
+        cursor.execute('''
+            SELECT id, username, email, role, first_name, last_name, phone, address, city, postal_code, created_at, updated_at
+            FROM users WHERE id = ?
+        ''', (current_user['id'],))
     
     user = cursor.fetchone()
     conn.close()
@@ -1431,19 +1477,35 @@ def update_user_profile(current_user):
     cursor = conn.cursor()
     
     # Обновляем только разрешенные поля
-    cursor.execute('''
-        UPDATE users 
-        SET first_name = ?, last_name = ?, phone = ?, address = ?, city = ?, postal_code = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-    ''', (
-        data.get('first_name', ''),
-        data.get('last_name', ''),
-        data.get('phone', ''),
-        data.get('address', ''),
-        data.get('city', ''),
-        data.get('postal_code', ''),
-        current_user['id']
-    ))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('''
+            UPDATE users 
+            SET first_name = %s, last_name = %s, phone = %s, address = %s, city = %s, postal_code = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        ''', (
+            data.get('first_name', ''),
+            data.get('last_name', ''),
+            data.get('phone', ''),
+            data.get('address', ''),
+            data.get('city', ''),
+            data.get('postal_code', ''),
+            current_user['id']
+        ))
+    else:
+        cursor.execute('''
+            UPDATE users 
+            SET first_name = ?, last_name = ?, phone = ?, address = ?, city = ?, postal_code = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (
+            data.get('first_name', ''),
+            data.get('last_name', ''),
+            data.get('phone', ''),
+            data.get('address', ''),
+            data.get('city', ''),
+            data.get('postal_code', ''),
+            current_user['id']
+        ))
     
     conn.commit()
     conn.close()
@@ -1462,8 +1524,13 @@ def update_password(current_user):
     conn = get_db_connection()
     cursor = conn.cursor()
     
+    db_type = get_db_type()
+    
     # Проверяем текущий пароль
-    cursor.execute('SELECT password_hash FROM users WHERE id = ?', (current_user['id'],))
+    if db_type == 'postgresql':
+        cursor.execute('SELECT password_hash FROM users WHERE id = %s', (current_user['id'],))
+    else:
+        cursor.execute('SELECT password_hash FROM users WHERE id = ?', (current_user['id'],))
     user = cursor.fetchone()
     
     if not user or not bcrypt.checkpw(data['current_password'].encode('utf-8'), user[0].encode('utf-8')):
@@ -1474,11 +1541,18 @@ def update_password(current_user):
     new_password_hash = bcrypt.hashpw(data['new_password'].encode('utf-8'), bcrypt.gensalt())
     
     # Обновляем пароль
-    cursor.execute('''
-        UPDATE users 
-        SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
-        WHERE id = ?
-    ''', (new_password_hash.decode('utf-8'), current_user['id']))
+    if db_type == 'postgresql':
+        cursor.execute('''
+            UPDATE users 
+            SET password_hash = %s, updated_at = CURRENT_TIMESTAMP
+            WHERE id = %s
+        ''', (new_password_hash.decode('utf-8'), current_user['id']))
+    else:
+        cursor.execute('''
+            UPDATE users 
+            SET password_hash = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        ''', (new_password_hash.decode('utf-8'), current_user['id']))
     
     conn.commit()
     conn.close()
@@ -1516,7 +1590,11 @@ def get_content_item(section, key):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT content_value, content_type FROM page_content WHERE section_name = ? AND content_key = ?', (section, key))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('SELECT content_value, content_type FROM page_content WHERE section_name = %s AND content_key = %s', (section, key))
+    else:
+        cursor.execute('SELECT content_value, content_type FROM page_content WHERE section_name = ? AND content_key = ?', (section, key))
     item = cursor.fetchone()
     
     conn.close()
@@ -1548,22 +1626,39 @@ def update_content_item(current_user, section, key):
     cursor = conn.cursor()
     
     # Проверяем, существует ли элемент
-    cursor.execute('SELECT id FROM page_content WHERE section_name = ? AND content_key = ?', (section, key))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('SELECT id FROM page_content WHERE section_name = %s AND content_key = %s', (section, key))
+    else:
+        cursor.execute('SELECT id FROM page_content WHERE section_name = ? AND content_key = ?', (section, key))
     existing_item = cursor.fetchone()
     
     if existing_item:
         # Обновляем существующий элемент
-        cursor.execute('''
-            UPDATE page_content 
-            SET content_value = ?, content_type = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE section_name = ? AND content_key = ?
-        ''', (new_value, content_type, section, key))
+        if db_type == 'postgresql':
+            cursor.execute('''
+                UPDATE page_content 
+                SET content_value = %s, content_type = %s, updated_at = CURRENT_TIMESTAMP
+                WHERE section_name = %s AND content_key = %s
+            ''', (new_value, content_type, section, key))
+        else:
+            cursor.execute('''
+                UPDATE page_content 
+                SET content_value = ?, content_type = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE section_name = ? AND content_key = ?
+            ''', (new_value, content_type, section, key))
     else:
         # Создаем новый элемент
-        cursor.execute('''
-            INSERT INTO page_content (section_name, content_key, content_value, content_type)
-            VALUES (?, ?, ?, ?)
-        ''', (section, key, new_value, content_type))
+        if db_type == 'postgresql':
+            cursor.execute('''
+                INSERT INTO page_content (section_name, content_key, content_value, content_type)
+                VALUES (%s, %s, %s, %s)
+            ''', (section, key, new_value, content_type))
+        else:
+            cursor.execute('''
+                INSERT INTO page_content (section_name, content_key, content_value, content_type)
+                VALUES (?, ?, ?, ?)
+            ''', (section, key, new_value, content_type))
     
     conn.commit()
     conn.close()
@@ -1599,22 +1694,39 @@ def update_content_batch(current_user):
                     content_type = item_data.get('type', 'text')
                     
                     # Проверяем, существует ли элемент
-                    cursor.execute('SELECT id FROM page_content WHERE section_name = ? AND content_key = ?', (section, key))
+                    db_type = get_db_type()
+                    if db_type == 'postgresql':
+                        cursor.execute('SELECT id FROM page_content WHERE section_name = %s AND content_key = %s', (section, key))
+                    else:
+                        cursor.execute('SELECT id FROM page_content WHERE section_name = ? AND content_key = ?', (section, key))
                     existing_item = cursor.fetchone()
                     
                     if existing_item:
                         # Обновляем существующий элемент
-                        cursor.execute('''
-                            UPDATE page_content 
-                            SET content_value = ?, content_type = ?, updated_at = CURRENT_TIMESTAMP
-                            WHERE section_name = ? AND content_key = ?
-                        ''', (value, content_type, section, key))
+                        if db_type == 'postgresql':
+                            cursor.execute('''
+                                UPDATE page_content 
+                                SET content_value = %s, content_type = %s, updated_at = CURRENT_TIMESTAMP
+                                WHERE section_name = %s AND content_key = %s
+                            ''', (value, content_type, section, key))
+                        else:
+                            cursor.execute('''
+                                UPDATE page_content 
+                                SET content_value = ?, content_type = ?, updated_at = CURRENT_TIMESTAMP
+                                WHERE section_name = ? AND content_key = ?
+                            ''', (value, content_type, section, key))
                     else:
                         # Создаем новый элемент
-                        cursor.execute('''
-                            INSERT INTO page_content (section_name, content_key, content_value, content_type)
-                            VALUES (?, ?, ?, ?)
-                        ''', (section, key, value, content_type))
+                        if db_type == 'postgresql':
+                            cursor.execute('''
+                                INSERT INTO page_content (section_name, content_key, content_value, content_type)
+                                VALUES (%s, %s, %s, %s)
+                            ''', (section, key, value, content_type))
+                        else:
+                            cursor.execute('''
+                                INSERT INTO page_content (section_name, content_key, content_value, content_type)
+                                VALUES (?, ?, ?, ?)
+                            ''', (section, key, value, content_type))
                     
                     updated_items.append({
                         'section': section,
@@ -1650,7 +1762,11 @@ def get_section_content(section):
     conn = get_db_connection()
     cursor = conn.cursor()
     
-    cursor.execute('SELECT content_key, content_value, content_type FROM page_content WHERE section_name = ? ORDER BY content_key', (section,))
+    db_type = get_db_type()
+    if db_type == 'postgresql':
+        cursor.execute('SELECT content_key, content_value, content_type FROM page_content WHERE section_name = %s ORDER BY content_key', (section,))
+    else:
+        cursor.execute('SELECT content_key, content_value, content_type FROM page_content WHERE section_name = ? ORDER BY content_key', (section,))
     items = cursor.fetchall()
     
     conn.close()
