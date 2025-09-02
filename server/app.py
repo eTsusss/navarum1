@@ -399,14 +399,24 @@ def init_db():
         ]
         
         for product in products_data:
-            cursor.execute('''
-                INSERT INTO products (name, description, price, image_url, category, size, material, density)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                product['name'], product['description'], product['price'], 
-                product['image_url'], product['category'], product['size'], 
-                product['material'], product['density']
-            ))
+            if db_type == 'postgresql':
+                cursor.execute('''
+                    INSERT INTO products (name, description, price, image_url, category, size, material, density)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                ''', (
+                    product['name'], product['description'], product['price'], 
+                    product['image_url'], product['category'], product['size'], 
+                    product['material'], product['density']
+                ))
+            else:
+                cursor.execute('''
+                    INSERT INTO products (name, description, price, image_url, category, size, material, density)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (
+                    product['name'], product['description'], product['price'], 
+                    product['image_url'], product['category'], product['size'], 
+                    product['material'], product['density']
+                ))
     
     # Добавляем только администратора по умолчанию, если таблица пользователей пустая
     cursor.execute('SELECT COUNT(*) FROM users')
@@ -417,10 +427,16 @@ def init_db():
         admin_password_hash = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt())
         
         # Добавляем только администратора
-        cursor.execute('''
-            INSERT INTO users (username, email, password_hash, role)
-            VALUES (?, ?, ?, ?)
-        ''', (admin_username, 'admin@navarum.ru', admin_password_hash.decode('utf-8'), 'admin'))
+        if db_type == 'postgresql':
+            cursor.execute('''
+                INSERT INTO users (username, email, password_hash, role)
+                VALUES (%s, %s, %s, %s)
+            ''', (admin_username, 'admin@navarum.ru', admin_password_hash.decode('utf-8'), 'admin'))
+        else:
+            cursor.execute('''
+                INSERT INTO users (username, email, password_hash, role)
+                VALUES (?, ?, ?, ?)
+            ''', (admin_username, 'admin@navarum.ru', admin_password_hash.decode('utf-8'), 'admin'))
     
     # Добавляем контент страницы по умолчанию, если таблица пустая
     cursor.execute('SELECT COUNT(*) FROM page_content')
@@ -516,10 +532,16 @@ def init_db():
         ]
         
         for section, key, value, content_type in default_content:
-            cursor.execute('''
-                INSERT INTO page_content (section_name, content_key, content_value, content_type)
-                VALUES (?, ?, ?, ?)
-            ''', (section, key, value, content_type))
+            if db_type == 'postgresql':
+                cursor.execute('''
+                    INSERT INTO page_content (section_name, content_key, content_value, content_type)
+                    VALUES (%s, %s, %s, %s)
+                ''', (section, key, value, content_type))
+            else:
+                cursor.execute('''
+                    INSERT INTO page_content (section_name, content_key, content_value, content_type)
+                    VALUES (?, ?, ?, ?)
+                ''', (section, key, value, content_type))
     
     conn.commit()
     conn.close()
